@@ -1,0 +1,179 @@
+{
+  "name": "modern-ts",
+  "author": "HiraethCyan",
+  "description": "A modern TypeScript standard suite - self-contained, zero dependencies, 100% coverage, tree-shakeable, and high-performance.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hiraeth-Cyan/modern-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Hiraeth-Cyan/modern-ts/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.8.0",
+  "license": "Apache-2.0",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/types/index.d.ts",
+  "type": "module",
+  "keywords": [
+    "typescript",
+    "utility",
+    "functional-programming",
+    "result",
+    "maybe",
+    "either",
+    "async",
+    "concurrency",
+    "resource-management",
+    "reactive",
+    "mock-clock",
+    "testing",
+    "reader",
+    "scheduler",
+    "channel",
+    "mutex",
+    "semaphore",
+    "circuit-breaker",
+    "rate-limiter",
+    "debounce",
+    "event-emitter",
+    "beta"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    },
+    "./Maybe": {
+      "types": "./dist/types/Maybe/__export__.d.ts",
+      "require": "./dist/subpath/Maybe.cjs",
+      "import": "./dist/subpath/Maybe.mjs"
+    },
+    "./Result": {
+      "types": "./dist/types/Result/__export__.d.ts",
+      "require": "./dist/subpath/Result.cjs",
+      "import": "./dist/subpath/Result.mjs"
+    },
+    "./Resource": {
+      "types": "./dist/types/Resource/__export-resource__.d.ts",
+      "require": "./dist/subpath/Resource.cjs",
+      "import": "./dist/subpath/Resource.mjs"
+    },
+    "./TxScope": {
+      "types": "./dist/types/Resource/__export-TxScope__.d.ts",
+      "require": "./dist/subpath/TxScope.cjs",
+      "import": "./dist/subpath/TxScope.mjs"
+    },
+    "./Reader": {
+      "types": "./dist/types/Reader/__export-reader__.d.ts",
+      "require": "./dist/subpath/Reader.cjs",
+      "import": "./dist/subpath/Reader.mjs"
+    },
+    "./ReaderT": {
+      "types": "./dist/types/Reader/__export-readerT__.d.ts",
+      "require": "./dist/subpath/ReaderT.cjs",
+      "import": "./dist/subpath/ReaderT.mjs"
+    },
+    "./Lazy": {
+      "types": "./dist/types/Other/lazy.d.ts",
+      "require": "./dist/subpath/Lazy.cjs",
+      "import": "./dist/subpath/Lazy.mjs"
+    },
+    "./FetchQ": {
+      "types": "./dist/types/Other/FetchQ.d.ts",
+      "require": "./dist/subpath/FetchQ.cjs",
+      "import": "./dist/subpath/FetchQ.mjs"
+    },
+    "./Fit": {
+      "types": "./dist/types/Fit/__export__.d.ts",
+      "require": "./dist/subpath/Fit.cjs",
+      "import": "./dist/subpath/Fit.mjs"
+    },
+    "./VirtualTime": {
+      "types": "./dist/types/MockClock/__export__.d.ts",
+      "require": "./dist/subpath/VirtualTime.cjs",
+      "import": "./dist/subpath/VirtualTime.mjs"
+    },
+    "./Concurrent": {
+      "types": "./dist/types/Concurrent/__export__.d.ts",
+      "require": "./dist/subpath/Concurrent.cjs",
+      "import": "./dist/subpath/Concurrent.mjs"
+    },
+    "./Reactive": {
+      "types": "./dist/types/Reactive/__export__.d.ts",
+      "require": "./dist/subpath/Reactive.cjs",
+      "import": "./dist/subpath/Reactive.mjs"
+    },
+    "./Utils": {
+      "types": "./dist/types/Utils/__export__.d.ts",
+      "require": "./dist/subpath/Utils.cjs",
+      "import": "./dist/subpath/Utils.mjs"
+    },
+    "./Arr": {
+      "types": "./dist/types/Utils/Array/__export__.d.ts",
+      "require": "./dist/subpath/Arr.cjs",
+      "import": "./dist/subpath/Arr.mjs"
+    },
+    "./Str": {
+      "types": "./dist/types/Utils/String.d.ts",
+      "require": "./dist/subpath/Str.cjs",
+      "import": "./dist/subpath/Str.mjs"
+    },
+    "./Sets": {
+      "types": "./dist/types/Utils/Set.d.ts",
+      "require": "./dist/subpath/Sets.cjs",
+      "import": "./dist/subpath/Sets.mjs"
+    },
+    "./Maps": {
+      "types": "./dist/types/Utils/Map.d.ts",
+      "require": "./dist/subpath/Maps.cjs",
+      "import": "./dist/subpath/Maps.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --project tsconfig.build.json && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.0",
+    "@vitest/coverage-istanbul": "4.0.18",
+    "@vitest/coverage-v8": "4.0.18",
+    "@vitest/ui": "4.0.18",
+    "cli-table3": "^0.6.5",
+    "esbuild": "^0.27.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "prettier": "^3.7.4",
+    "rollup-plugin-visualizer": "^6.0.5",
+    "tsx": "^4.21.0",
+    "typedoc": "^0.28.15",
+    "typedoc-plugin-markdown": "^4.9.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.49.0",
+    "valibot": "^1.2.0",
+    "vite": "^7.1.7",
+    "vite-node": "^5.2.0",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "4.0.18",
+    "zod": "^4.3.6"
+  }
+}
