@@ -150,17 +150,23 @@ result.ok === true, result.value is the validated object with type:
 ### Example: MockClock Concurrent Time Simulation
 
 ```typescript
-import { MockClock, withTimelineAsync } from 'modern-ts/VirtualTime';
+import { MockClock, runTimelineAsync } from 'modern-ts/VirtualTime';
 
 // Concurrent testing: two independent timelines, isolated from each other
-const [t1, t2] = await Promise.all([
-  withTimelineAsync(MockClock(), async (clock) => {
-    clock.setSystemTime(1000); // Set start time
-    return Date.now(); // 1000
+const clock1 = MockClock();
+const clock2 = MockClock();
+
+let t1: number;
+let t2: number;
+
+await Promise.all([
+  withTimelineAsync(clock1, async () => {
+    clock1.setSystemTime(1000); // Set start time
+    t1 = Date.now(); // 1000
   }),
-  withTimelineAsync(MockClock(), async (clock) => {
-    clock.setSystemTime(2000); // Different start time
-    return Date.now(); // 2000
+  withTimelineAsync(clock2, async () => {
+    clock2.setSystemTime(2000); // Different start time
+    t2 = Date.now(); // 2000
   }),
 ]);
 // t1 === 1000, t2 === 2000 (timeline isolation)

@@ -26,14 +26,14 @@
 
 完善的系统级并发原语集合：
 
-| 子模块           | 说明                                                                |
-| ------------- | ----------------------------------------------------------------- |
+| 子模块        | 说明                                                                     |
+| ------------- | ------------------------------------------------------------------------ |
 | **Lock**      | `Mutex`、`Semaphore`、`ConditionVariable`、`RwLock` 等并发锁             |
 | **Valve**     | `TokenBucket`、`LeakyBucket`、`SlidingWindow`、`CircuitBreaker` 流量控制 |
-| **Limit**     | 并发任务数量控制（比 `p-limit` 更完善）                                        |
-| **Channel**   | Go 语言 CSP 模型实现                                                    |
-| **Scheduler** | CFS-Like 协作式异步调度器                                                 |
-| **TaskScope** | 结构化并发作用域                                                          |
+| **Limit**     | 并发任务数量控制（比 `p-limit` 更完善）                                  |
+| **Channel**   | Go 语言 CSP 模型实现                                                     |
+| **Scheduler** | CFS-Like 协作式异步调度器                                                |
+| **TaskScope** | 结构化并发作用域                                                         |
 
 ### ⏰ MockClock — 模拟时钟
 
@@ -41,11 +41,11 @@
 
 ### 🎭 Monad — 常用的函数式原语
 
-| 模块         | 用途    |
-| ---------- | ----- |
-| **Result** | 错误处理  |
+| 模块       | 用途       |
+| ---------- | ---------- |
+| **Result** | 错误处理   |
 | **Maybe**  | 可选值处理 |
-| **Reader** | 依赖注入  |
+| **Reader** | 依赖注入   |
 
 ### 🛠️ Utils — 工具函数
 
@@ -66,11 +66,11 @@
 
 ### 📦 其他模块
 
-| 模块               | 说明                                              |
-| ---------------- | ----------------------------------------------- |
-| **Other**        | 常用数据结构（Deque、Heap、Queue、Stack、DisjointSet）及工具函数 |
-| **Resource**     | 基于 `using` 的 RAII 资源管理器                         |
-| **Flow**         | 类似 RxJS 的响应式原语，支持控制权反转                          |
+| 模块             | 说明                                                                     |
+| ---------------- | ------------------------------------------------------------------------ |
+| **Other**        | 常用数据结构（Deque、Heap、Queue、Stack、DisjointSet）及工具函数         |
+| **Resource**     | 基于 `using` 的 RAII 资源管理器                                          |
+| **Flow**         | 类似 RxJS 的响应式原语，支持控制权反转                                   |
 | **EventEmitter** | 跨平台 EventEmitter，行为几乎无异的同时多项性能指标优于 Node.js 原生模块 |
 
 ## 安装
@@ -150,20 +150,26 @@ result.ok === true, result.value 为验证后的对象，类型如下：
 ### 示例：MockClock 并发时间模拟
 
 ```typescript
-import { MockClock, withTimelineAsync } from 'modern-ts/VirtualTime';
+import { MockClock, runTimelineAsync } from 'modern-ts/VirtualTime';
 
-// 并发测试：两个独立时间线，互不干扰
-const [t1, t2] = await Promise.all([
-  withTimelineAsync(MockClock(), async (clock) => {
-    clock.setSystemTime(1000); // 设置起始时间
-    return Date.now(); // 1000
+// Concurrent testing: two independent timelines, isolated from each other
+const clock1 = MockClock();
+const clock2 = MockClock();
+
+let t1: number;
+let t2: number;
+
+await Promise.all([
+  withTimelineAsync(clock1, async () => {
+    clock1.setSystemTime(1000); // Set start time
+    t1 = Date.now(); // 1000
   }),
-  withTimelineAsync(MockClock(), async (clock) => {
-    clock.setSystemTime(2000); // 不同的起始时间
-    return Date.now(); // 2000
+  withTimelineAsync(clock2, async () => {
+    clock2.setSystemTime(2000); // Different start time
+    t2 = Date.now(); // 2000
   }),
 ]);
-// t1 === 1000, t2 === 2000（时间线隔离）
+// t1 === 1000, t2 === 2000 (timeline isolation)
 ```
 
 ### 示例：Scheduler 协作式调度
@@ -189,25 +195,25 @@ await Promise.all([
 
 ## 子路径导出
 
-| 路径                      | 说明            |
-| ----------------------- | ------------- |
-| `modern-ts/Result`      | Result 错误处理   |
-| `modern-ts/Maybe`       | Maybe 可选值     |
-| `modern-ts/Reader`      | Reader 依赖注入   |
+| 路径                    | 说明               |
+| ----------------------- | ------------------ |
+| `modern-ts/Result`      | Result 错误处理    |
+| `modern-ts/Maybe`       | Maybe 可选值       |
+| `modern-ts/Reader`      | Reader 依赖注入    |
 | `modern-ts/ReaderT`     | ReaderT 单子转换器 |
-| `modern-ts/Resource`    | RAII 资源管理     |
+| `modern-ts/Resource`    | RAII 资源管理      |
 | `modern-ts/TxScope`     | RAII 事务作用域    |
-| `modern-ts/Lazy`        | 延迟计算          |
+| `modern-ts/Lazy`        | 延迟计算           |
 | `modern-ts/LiteQ`       | 轻量级队列         |
-| `modern-ts/Fit`         | Schema 验证     |
-| `modern-ts/VirtualTime` | 虚拟时间          |
-| `modern-ts/Concurrent`  | 并发原语          |
+| `modern-ts/Fit`         | Schema 验证        |
+| `modern-ts/VirtualTime` | 虚拟时间           |
+| `modern-ts/Concurrent`  | 并发原语           |
 | `modern-ts/Reactive`    | 响应式原语         |
-| `modern-ts/Utils`       | 工具函数          |
-| `modern-ts/Arr`         | 数组工具          |
+| `modern-ts/Utils`       | 工具函数           |
+| `modern-ts/Arr`         | 数组工具           |
 | `modern-ts/Str`         | 字符串工具         |
-| `modern-ts/Sets`        | Set 工具        |
-| `modern-ts/Maps`        | Map 工具        |
+| `modern-ts/Sets`        | Set 工具           |
+| `modern-ts/Maps`        | Map 工具           |
 
 ## API 文档
 
