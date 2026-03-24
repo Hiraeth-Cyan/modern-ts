@@ -10,7 +10,7 @@ Self-contained · Zero Dependencies · 100% Coverage · Tree-shakeable · High P
 
 > ⚠️ **Beta Notice**: Currently in beta phase, collecting community feedback. API may undergo breaking changes at any time. Use with caution in production environments.
 
----
+***
 
 ## Features
 
@@ -224,7 +224,8 @@ await Promise.all([
 
 ## API Documentation
 
-For detailed API documentation, see the [docs/en](./docs/en) directory.
+For detailed API documentation, see the [docs/en-US](./docs/en-US) directory.
+Or run `npm run typedoc` to generate API documentation.
 
 ## Requirements
 

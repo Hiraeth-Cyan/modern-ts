@@ -225,6 +225,7 @@ await Promise.all([
 ## API 文档
 
 详细的 API 文档请参阅 [docs/zh-CN](./docs/zh-CN) 目录）
+或`npm typedoc` 生成 API文档
 
 ## 环境要求
 
