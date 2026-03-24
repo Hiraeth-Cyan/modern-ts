@@ -411,10 +411,6 @@ export class DEBUG_MUTEX extends Mutex {
   /**
    * @inheritdoc
    * @throws {MutexError} If acquisition times out (with stack traces).
-   *
-   * @remarks
-   * - On timeout, the error includes the current request stack and holder stack (if any).
-   * - If the user's `signal` aborts, throws a standard `AbortError` `DOMException`.
    */
   public async lock(signal?: AbortSignal): Promise<void> {
     const current_stack = new Error().stack;

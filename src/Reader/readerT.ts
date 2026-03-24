@@ -291,7 +291,6 @@ export const orElse = <R, E, A, F>(
  * @typeParam T - The type of input items.
  * @typeParam A - The type of output values.
  * @param f_ta - The function (T) => ReaderT<R, E, A> to apply to each item.
- * @param items - The list of items T to process.
  * @returns ReaderT<R, E, A[]> that contains an array of results A or the first error E.
  */
 export const traverse =

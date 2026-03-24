@@ -10,8 +10,8 @@ import type {AnyMaybe, AsyncMaybe} from './types';
 
 /**
  * Applies async function from Maybe to async value.
- * @typeparam T - Input type
- * @typeparam R - Result type
+ * @template T - Input type
+ * @template R - Result type
  * @param fn_val - Maybe function
  * @param val - Maybe value
  * @param signal - Optional AbortSignal
@@ -33,8 +33,8 @@ export const apAsync = async <T, R>(
 
 /**
  * Transforms async Maybe value with async function.
- * @typeparam T - Input type
- * @typeparam R - Result type
+ * @template T - Input type
+ * @template R - Result type
  * @param val - Maybe value
  * @param fn - Async transformation function
  * @param signal - Optional AbortSignal
@@ -53,8 +53,8 @@ export const mapAsync = async <T, R>(
 
 /**
  * Maps value only if predicate passes (async).
- * @typeparam T - Input type
- * @typeparam R - Result type
+ * @template T - Input type
+ * @template R - Result type
  * @param val - Maybe value
  * @param predicate - Async condition check
  * @param fn - Async transformation function
@@ -79,8 +79,8 @@ export const mapIfAsync = async <T, R>(
 
 /**
  * Chains async computations that may fail.
- * @typeparam T - Input type
- * @typeparam R - Result type
+ * @template T - Input type
+ * @template R - Result type
  * @param val - Maybe value
  * @param fn - Async function returning Maybe
  * @param signal - Optional AbortSignal
@@ -99,7 +99,7 @@ export const andThenAsync = async <T, R>(
 
 /**
  * Filters async Maybe value with async predicate.
- * @typeparam T - Value type
+ * @template T - Value type
  * @param val - Maybe value
  * @param predicate - Async filter condition
  * @param signal - Optional AbortSignal
@@ -126,8 +126,8 @@ export const filterAsync = async <T>(
 
 /**
  * Zips two async Maybes into tuple if both are Some.
- * @typeparam T - First type
- * @typeparam U - Second type
+ * @template T - First type
+ * @template U - Second type
  * @param a - First Maybe
  * @param b - Second Maybe
  * @param signal - Optional AbortSignal
@@ -150,8 +150,8 @@ export const zipAsync = async <T, U>(
 
 /**
  * Extracts value from async Maybe or returns default.
- * @typeparam T - Input type
- * @typeparam R - Result type
+ * @template T - Input type
+ * @template R - Result type
  * @param val - Maybe value
  * @param initial - Default value or Promise
  * @param onSome - Async handler for Some case
@@ -172,7 +172,7 @@ export const foldAsync = async <T, R>(
 
 /**
  * Returns value if Some, otherwise async fallback.
- * @typeparam T - Value type
+ * @template T - Value type
  * @param val - Maybe value
  * @param fn - Async fallback supplier
  * @param signal - Optional AbortSignal
@@ -195,8 +195,8 @@ export const orElseAsync = async <T>(
 
 /**
  * Maps array with async function, fails if any returns None.
- * @typeparam T - Input type
- * @typeparam R - Output type
+ * @template T - Input type
+ * @template R - Output type
  * @param items - Input array
  * @param fn - Async mapping function
  * @param signal - Optional AbortSignal
@@ -226,7 +226,7 @@ export const mapAllAsync = async <T, R>(
 
 /**
  * Returns all async values if all are Some, None otherwise.
- * @typeparam T - Element type
+ * @template T - Element type
  * @param vals - Array of async Maybes
  * @param signal - Optional AbortSignal
  * @returns AsyncMaybe<T[]>
@@ -248,7 +248,7 @@ export const allAsync = async <T>(
 
 /**
  * Returns first Some value from async array, None if none found.
- * @typeparam T - Element type
+ * @template T - Element type
  * @param vals - Array of async Maybes
  * @param signal - Optional AbortSignal
  * @returns AsyncMaybe<T>
@@ -278,8 +278,8 @@ export const firstSomeAsync = async <T>(
 
 /**
  * Reduces array of async Maybes with async reducer.
- * @typeparam T - Element type
- * @typeparam R - Result type
+ * @template T - Element type
+ * @template R - Result type
  * @param vals - Array of async Maybes
  * @param initial - Initial value
  * @param reducer - Async reduction function
@@ -312,8 +312,8 @@ export async function reduceAsync<T, R>(
 
 /**
  * Performs async scan reduction on array of async Maybes.
- * @typeparam T - Element type
- * @typeparam R - Result type
+ * @template T - Element type
+ * @template R - Result type
  * @param vals - Array of async Maybes
  * @param initial - Initial value
  * @param scanner - Async scanning function
@@ -353,7 +353,7 @@ export async function scanAsync<T, R>(
 
 /**
  * Collects all Some values from async array.
- * @typeparam T - Element type
+ * @template T - Element type
  * @param vals - Array of async Maybes
  * @param signal - Optional AbortSignal
  * @returns Promise<T[]> - Only Some values
@@ -375,7 +375,7 @@ export const collectSomesAsync = async <T>(
 
 /**
  * Partitions async array into Some values and None count.
- * @typeparam T - Element type
+ * @template T - Element type
  * @param vals - Array of async Maybes
  * @param signal - Optional AbortSignal
  * @returns Promise<[T[], number]> - [Some values, None count]

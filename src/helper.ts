@@ -62,15 +62,15 @@ export const isResultLike = (
           : 'error' in v && !('value' in v);
       })();
 
-
-      export const wrapError = (e: unknown) =>
+export const wrapError = (e: unknown) =>
   e instanceof DOMException && e.name === 'AbortError'
     ? e
     : UnknownError.from(e);
 
 /**
  * Flushes all pending microtasks and macroscheduled tasks.
- * @description
+ *
+ *
  * This utility is particularly useful in testing environments to ensure that all
  * asynchronous operations (like Promises or API calls) and their subsequent
  * DOM updates have been processed before making assertions.

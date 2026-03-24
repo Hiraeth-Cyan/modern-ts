@@ -4,13 +4,13 @@
 
 import {describe, it, expect, vi, afterAll} from 'vitest';
 import {Stop, Continue, expBackoff, expJitter, pacer, retry} from './pace';
-import {isOk, isErr} from '../Result/base';
+import {isOk, isErr} from '../../Result/base';
 import {
   MockClock,
   runTimelineAsync,
   restoreGlobals,
-} from '../MockClock/__export__';
-import {type Result} from '../Result/types';
+} from '../../MockClock/__export__';
+import {type Result} from '../../Result/types';
 afterAll(() => {
   restoreGlobals();
 });

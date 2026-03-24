@@ -33,7 +33,7 @@ A comprehensive collection of system-level concurrency primitives:
 | **Limit**     | Concurrent task quantity control (more complete than `p-limit`)                 |
 | **Channel**   | Go language CSP model implementation                                            |
 | **Scheduler** | CFS-Like cooperative async scheduler                                            |
-| **TaskScope** | Structured concurrency scope                                                    |
+| **TaskScope** | Structured concurrency manager                                                  |
 
 ### ⏰ MockClock — Mock Clock
 
@@ -70,7 +70,7 @@ A type-first, tree-shakeable, and highly extensible schema validation library.
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **Other**        | Common data structures (Deque, Heap, Queue, Stack, DisjointSet) and utility functions                                         |
 | **Resource**     | RAII resource manager based on `using`                                                                                        |
-| **Flow**         | RxJS-like reactive primitives with inversion of control                                                                       |
+| **Flow**         | Reactive stream (similar to RxJS) with inversion of control via consume method                                                |
 | **EventEmitter** | Cross-platform EventEmitter with nearly identical behavior and superior performance metrics compared to Node.js native module |
 
 ## Installation
@@ -127,13 +127,20 @@ if (isOk(result)) {
 ```typescript
 import * as f from 'modern-ts/Fit';
 
+interface User {
+  name: string;
+  age: number;
+  tags: string[];
+}
+
 const UserSchema = f
-  .fit<{name: string; age: number; tags: string[]} | 'VIP'>()
+  .fit<User | 'VIP'>()
   .off((v) => v === 'VIP', 'ok') // Short-circuit return 'ok' if VIP
   .toShaped({
     name: f.String().that(f.min_len(2)),
     age: f.Number().that(f.range(0, 150)),
     tags: f.items(f.String()),
+    // Compilation error if fields don't match User
   });
 
 const result = f.validate({name: 'Alice', age: 25, tags: ['dev']}, UserSchema);
@@ -200,11 +207,11 @@ await Promise.all([
 | `modern-ts/Result`      | Result error handling       |
 | `modern-ts/Maybe`       | Maybe optional values       |
 | `modern-ts/Reader`      | Reader dependency injection |
-| `modern-ts/ReaderT`     | ReaderT monad transformer   |
+| `modern-ts/ReaderT`     | Reader + Result             |
 | `modern-ts/Resource`    | RAII resource management    |
 | `modern-ts/TxScope`     | RAII transaction scope      |
 | `modern-ts/Lazy`        | Lazy evaluation             |
-| `modern-ts/LiteQ`       | Lightweight queue           |
+| `modern-ts/FetchQ`      | HTTP client                 |
 | `modern-ts/Fit`         | Schema validation           |
 | `modern-ts/VirtualTime` | Virtual time                |
 | `modern-ts/Concurrent`  | Concurrency primitives      |

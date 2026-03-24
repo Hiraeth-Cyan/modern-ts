@@ -86,15 +86,6 @@ export interface BaseFit {
 /**
  * A type-safe validation builder that uses a fluent API to construct validation pipelines.
  *
- * The Fit class uses several type parameters to track the validation state:
- * - T: The current type being validated
- * - Bail: The type returned when validation short-circuits via `off`
- * - Checked: Union of types already verified by type guards (prevents duplicate guards)
- * - Optional: Whether this field is optional in a shape schema
- * - IsReadonly: Whether the output should be wrapped in Readonly
- * - IsShape: Whether this schema includes a shape (prevents duplicate toShaped)
- * - IsArray: Whether this schema includes an array (prevents duplicate toArray)
- *
  * @template T - The output type after successful validation
  * @template Bail - The type returned when validation short-circuits
  * @template Checked - Union type of already-checked types
@@ -505,10 +496,6 @@ export type InferFit<F> =
       : T | Bail
     : never;
 
-/**
- * Extracts the Optional flag from a Fit instance.
- * @template F - The Fit instance type
- */
 type IsOptional<F extends BaseFit> =
   F extends Fit<
     infer _T,
@@ -522,10 +509,6 @@ type IsOptional<F extends BaseFit> =
     ? O
     : never;
 
-/**
- * Extracts the IsReadonly flag from a Fit instance.
- * @template F - The Fit instance type
- */
 type IsReadonly<F extends BaseFit> =
   F extends Fit<
     infer _T,
@@ -584,31 +567,22 @@ export type DeriveShape<F extends Record<string, unknown>> = {
     : never]?: InferFit<F[K]>;
 };
 
-/**
- * Validates that shape field schemas are compatible with the target type T.
- * Returns F if all fields match, or a constraint error type if not.
- *
- * @template T - The target object type
- * @template F - Record of field name to Fit schema
- */
 type ShapeFieldsMatch<T, F extends Record<string, BaseFit>> = unknown extends T
   ? F
   : T extends object
     ? keyof F extends keyof T
-      ? {
-          [K in keyof F]: InferFit<F[K]> extends T[K]
-            ? F[K]
-            : TypeMismatchError<F[K], T[K]>;
-        }
-      : {[K in Exclude<keyof F, keyof T>]: ExtraFieldError<K, T>}
+      ? keyof T extends keyof F
+        ? {
+            [K in keyof F]: InferFit<F[K]> extends T[K]
+              ? F[K]
+              : TypeMismatchError<F[K], T[K]>;
+          }
+        : never
+      : never
     : F;
 
 type TypeMismatchError<Actual, Expected> = {
   __type_mismatch__: {actual: Actual; expected: Expected};
-};
-
-type ExtraFieldError<K extends PropertyKey, T> = {
-  __extra_field__: {field: K; targetKeys: keyof T};
 };
 
 type ArrayElementMatch<T, F extends BaseFit> = unknown extends T
@@ -708,7 +682,7 @@ export const toOptional = <
 /**
  * Creates a new Fit instance starting from type T.
  *
- * @template T - The initial type to validate
+ * @template T - The type ready to be validated in the pipeline
  * @returns A new Fit<T> instance
  */
 export const fit = <T>() => new Fit<T>();

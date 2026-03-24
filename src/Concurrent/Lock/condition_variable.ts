@@ -322,7 +322,6 @@ export class DEBUG_CONDITION_VARIABLE extends ConditionVariable {
   }
 
   /**
-   * Waits with timeout detection.
    * @inheritdoc
    * @throws {LockError} With stack traces if wait times out.
    */
@@ -362,7 +361,6 @@ export class DEBUG_CONDITION_VARIABLE extends ConditionVariable {
   }
 
   /**
-   * Notifies one waiter and captures stack trace.
    * @inheritdoc
    */
   public notifyOne(): void {
@@ -371,7 +369,6 @@ export class DEBUG_CONDITION_VARIABLE extends ConditionVariable {
   }
 
   /**
-   * Notifies all waiters and captures stack trace.
    * @inheritdoc
    */
   public notifyAll(): void {
@@ -380,7 +377,6 @@ export class DEBUG_CONDITION_VARIABLE extends ConditionVariable {
   }
 
   /**
-   * Disposes and clears debug information.
    * @inheritdoc
    */
   public dispose(): void {

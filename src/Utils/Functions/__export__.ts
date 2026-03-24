@@ -6,3 +6,4 @@ export {curry, __} from './curry';
 export * from './debounce';
 export * from './base';
 export * from './defer';
+export * from './pace';

@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* v8 ignore file -- @preserve */
 
+export type AnyFunction = (...args: any[]) => any;
+
 /**
  * Represents a value that can be either a plain value or a Promise-like object.
  * @template T - The type of the value or Promise-like object.
@@ -175,7 +177,7 @@ export const castErr = (e: unknown) => e as Error;
  * Asserts that one type is assignable to another.
  * @template T - The source type
  * @template U - The target type
- * @param _value - The value to use for type inference
+ * @param _ - The value to use for type inference
  * @returns A function that expects a value assignable to T
  */
 export const expectAssignable = <T>(_: T): void => {};
@@ -196,7 +198,6 @@ export type Equals<X, Y> =
  * Asserts that one type is identical to another.
  * @template T - The source type
  * @template U - The target type
- * @param _value - The value to use for type inference
  * @returns A function that expects a value identical to T
  *
  * @example

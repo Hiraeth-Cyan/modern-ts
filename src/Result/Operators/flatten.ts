@@ -53,7 +53,6 @@ export function deepFlatten<T, E>(
  * @typeParam T - The type of the success value
  * @typeParam E - The type of the error
  * @param result_promise - The deeply nested Result or `Promise<Result<T, E>>` to flatten
- * @param signal - Optional AbortSignal for cancellation
  * @returns The Promise resolving to the flattened Result
  */
 export async function deepFlattenAsync<T, E>(

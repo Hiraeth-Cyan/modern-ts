@@ -24,9 +24,7 @@ export function filter<T>(
 ): Set<T> {
   const result_set = new Set<T>();
   for (const value of set) {
-    if (predicate(value)) {
-      result_set.add(value);
-    }
+    if (predicate(value)) result_set.add(value);
   }
   return result_set;
 }
@@ -41,9 +39,7 @@ export function filter<T>(
  */
 export const map = <T, U>(set: Set<T>, iteratee: (value: T) => U): Set<U> => {
   const result_set = new Set<U>();
-  for (const value of set) {
-    result_set.add(iteratee(value));
-  }
+  for (const value of set) result_set.add(iteratee(value));
   return result_set;
 };
 
@@ -61,9 +57,7 @@ export const reduce = <T, U>(
   initial_value: U,
 ): U => {
   let accumulator = initial_value;
-  for (const value of set) {
-    accumulator = iteratee(accumulator, value);
-  }
+  for (const value of set) accumulator = iteratee(accumulator, value);
   return accumulator;
 };
 
@@ -122,11 +116,7 @@ export const filterInPlace = <T>(
   set: Set<T>,
   predicate: (value: T) => boolean,
 ): Set<T> => {
-  for (const value of set) {
-    if (!predicate(value)) {
-      set.delete(value);
-    }
-  }
+  for (const value of set) if (!predicate(value)) set.delete(value);
   return set;
 };
 
@@ -138,9 +128,7 @@ export const filterInPlace = <T>(
  * @returns The mutated target set
  */
 export const unionInPlace = <T>(target: Set<T>, other: Iterable<T>): Set<T> => {
-  for (const value of other) {
-    target.add(value);
-  }
+  for (const value of other) target.add(value);
   return target;
 };
 
@@ -156,11 +144,7 @@ export const intersectInPlace = <T>(
   other: Iterable<T>,
 ): Set<T> => {
   const other_set = other instanceof Set ? other : new Set(other);
-  for (const value of target) {
-    if (!other_set.has(value)) {
-      target.delete(value);
-    }
-  }
+  for (const value of target) if (!other_set.has(value)) target.delete(value);
   return target;
 };
 
@@ -175,9 +159,7 @@ export const differenceInPlace = <T>(
   target: Set<T>,
   other: Iterable<T>,
 ): Set<T> => {
-  for (const value of other) {
-    target.delete(value);
-  }
+  for (const value of other) target.delete(value);
   return target;
 };
 export const subtractInPlace = differenceInPlace;
@@ -194,9 +176,7 @@ export const some = <T>(
   set: Set<T>,
   predicate: (value: T) => boolean,
 ): boolean => {
-  for (const value of set) {
-    if (predicate(value)) return true;
-  }
+  for (const value of set) if (predicate(value)) return true;
   return false;
 };
 
@@ -212,9 +192,7 @@ export const every = <T>(
   set: Set<T>,
   predicate: (value: T) => boolean,
 ): boolean => {
-  for (const value of set) {
-    if (!predicate(value)) return false;
-  }
+  for (const value of set) if (!predicate(value)) return false;
   return true;
 };
 

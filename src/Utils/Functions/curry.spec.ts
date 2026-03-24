@@ -199,27 +199,155 @@ describe.concurrent('Curry Function (Runtime)', () => {
     expect(spyFn).toHaveBeenCalledTimes(1);
     expect(spyFn).toHaveBeenCalledWith(1, 2, 3);
   });
+});
 
-  it('should replace placeholder with undefined when excess arguments are provided in first call', () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-    const curriedAdd = curry(add, 3) as any; // 使用 any 绕过类型检查
+// ========================================
+// 7. 可变参数函数 (Rest Parameters / Variadic Functions)
+// ========================================
 
-    // 类型系统不允许，但我们强制运行时执行
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const result = curriedAdd(1, 2, __, 4);
-    // add(1, 2, undefined) => NaN
-    expect(result).toBeNaN();
+describe.concurrent('Rest parameters (variadic functions)', () => {
+  // 可变参数求和函数
+  const sumAll = (...nums: number[]) => nums.reduce((acc, n) => acc + n, 0);
+
+  // 可变参数拼接字符串
+  const joinStrings = (separator: string, ...parts: string[]) =>
+    parts.join(separator);
+
+  // 可变参数取最大值
+  const maxOf = (...nums: number[]) => Math.max(...nums);
+
+  // 带固定参数和可变参数的函数
+  const formatNumbers = (prefix: string, ...nums: number[]) =>
+    `${prefix}: [${nums.join(', ')}]`;
+
+  it('should handle rest parameters function with length=0 (throws error)', () => {
+    expect(() => curry(sumAll, 0)).toThrow(
+      'Invalid length: Expected a positive integer, but received 0.',
+    );
   });
 
-  it('should replace placeholder with undefined when excess arguments are provided in subsequent call', () => {
-    const curriedAdd = curry(add, 3);
-    // 第一次调用，正常类型
-    const partial = curriedAdd(1);
-    // 第二次调用，使用 any 绕过类型检查
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const result = (partial as any)(2, __, 4);
-    // add(1, 2, undefined) => NaN
-    expect(result).toBeNaN();
+  it('should handle rest parameters with length=1', () => {
+    const curriedSum = curry(sumAll, 1);
+    expect(curriedSum(5)).toBe(5);
+    expect(curriedSum(10)).toBe(10);
+  });
+
+  it('should handle rest parameters with length=3', () => {
+    const curriedSum = curry(sumAll, 3);
+
+    // 一次性提供所有参数
+    expect(curriedSum(1, 2, 3)).toBe(6);
+
+    // 分步调用
+    expect(curriedSum(1)(2)(3)).toBe(6);
+    expect(curriedSum(1, 2)(3)).toBe(6);
+    expect(curriedSum(1)(2, 3)).toBe(6);
+  });
+
+  it('should handle rest parameters with length=5', () => {
+    const curriedSum = curry(sumAll, 5);
+
+    expect(curriedSum(1, 2, 3, 4, 5)).toBe(15);
+    expect(curriedSum(1)(2)(3)(4)(5)).toBe(15);
+    expect(curriedSum(1, 2, 3)(4, 5)).toBe(15);
+  });
+
+  it('should handle fixed + rest parameters', () => {
+    const curriedJoin = curry(joinStrings, 3);
+
+    // (separator, part1, part2)
+    expect(curriedJoin('-', 'a', 'b')).toBe('a-b');
+    expect(curriedJoin('-')('a')('b')).toBe('a-b');
+    expect(curriedJoin('-', 'a')('b')).toBe('a-b');
+  });
+
+  it('should handle fixed + rest with length=4', () => {
+    const curriedJoin = curry(joinStrings, 4);
+
+    // (separator, part1, part2, part3)
+    expect(curriedJoin('-', 'a', 'b', 'c')).toBe('a-b-c');
+    expect(curriedJoin('-')('a')('b')('c')).toBe('a-b-c');
+  });
+
+  it('should handle rest parameters with placeholders', () => {
+    const curriedSum = curry(sumAll, 3);
+
+    // (__, 2, 3)(1) -> (1, 2, 3) -> 6
+    expect(curriedSum(__, 2, 3)(1)).toBe(6);
+
+    // (1, __)(2)(3) -> (1, 2, 3) -> 6
+    expect(curriedSum(1, __)(2)(3)).toBe(6);
+
+    // (__, __, 3)(1)(2) -> (1, 2, 3) -> 6
+    expect(curriedSum(__, __, 3)(1)(2)).toBe(6);
+  });
+
+  it('should handle fixed + rest with placeholders', () => {
+    const curriedFormat = curry(formatNumbers, 3);
+
+    // (prefix, num1, num2)
+    expect(curriedFormat('Sum', 1, 2)).toBe('Sum: [1, 2]');
+
+    // 占位符测试
+    expect(curriedFormat(__, 1, 2)('Sum')).toBe('Sum: [1, 2]');
+    expect(curriedFormat('Sum', __, 2)(1)).toBe('Sum: [1, 2]');
+    expect(curriedFormat(__, __, 2)('Sum', 1)).toBe('Sum: [1, 2]');
+  });
+
+  it('should handle Math.max style function', () => {
+    const curriedMax = curry(maxOf, 4);
+
+    expect(curriedMax(1, 2, 3, 4)).toBe(4);
+    expect(curriedMax(4, 3, 2, 1)).toBe(4);
+    expect(curriedMax(1)(5)(3)(2)).toBe(5);
+
+    // 占位符
+    expect(curriedMax(__, 5, __, 2)(1, 3)).toBe(5);
+  });
+
+  it('should not execute until length is met for rest params', () => {
+    const spyFn = vi.fn(sumAll);
+    const curriedSum = curry(spyFn, 3);
+
+    // 提供不足参数
+    const partial = curriedSum(1, 2);
+    expect(typeof partial).toBe('function');
+    expect(spyFn).not.toHaveBeenCalled();
+
+    // 提供足够参数
+    partial(3);
+    expect(spyFn).toHaveBeenCalledTimes(1);
+    expect(spyFn).toHaveBeenCalledWith(1, 2, 3);
+  });
+
+  it('should slice arguments to length for rest params', () => {
+    // 当提供的参数超过 length 时，应该只取前 length 个
+    const curriedSum = curry(sumAll, 3);
+
+    // 提供超过 3 个参数，应该只取前 3 个
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
+    expect((curriedSum as any)(1, 2, 3, 4, 5)).toBe(6); // 只用 1+2+3
+  });
+
+  it('should handle empty array result for rest params', () => {
+    // 创建一个返回数组的可变参数函数
+    const collect = (...items: number[]) => items;
+    const curriedCollect = curry(collect, 1);
+
+    expect(curriedCollect(42)).toEqual([42]);
+  });
+
+  it('should handle rest params with object arguments', () => {
+    type Item = {id: number; name: string};
+    const collectItems = (...items: Item[]) => items;
+
+    const curriedCollect = curry(collectItems, 2);
+
+    const item1 = {id: 1, name: 'a'};
+    const item2 = {id: 2, name: 'b'};
+
+    expect(curriedCollect(item1, item2)).toEqual([item1, item2]);
+    expect(curriedCollect(item1)(item2)).toEqual([item1, item2]);
   });
 });
 

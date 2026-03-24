@@ -4,7 +4,7 @@
 import {delay} from 'src/Concurrent/delay';
 import {Err, Ok} from 'src/Result/base';
 import type {Result} from 'src/Result/types';
-import type {MaybePromise} from '../Utils/type-tool';
+import type {MaybePromise} from '../type-tool';
 
 // 定义下一次动作的类型：停止并返回值，或者继续等待
 type NextAction<R> = {readonly value: R} | {readonly delay: number};
@@ -130,7 +130,6 @@ interface PaceRetryOptions {
  * @template T - The return type of the task
  * @param task - The async function to retry
  * @param options - Retry configuration options
- * @param signal - Optional AbortSignal for cancellation
  * @returns The result of the successful task execution
  * @throws Last error if all retry attempts fail
  */

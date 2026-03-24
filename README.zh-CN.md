@@ -33,7 +33,7 @@
 | **Limit**     | 并发任务数量控制（比 `p-limit` 更完善）                                  |
 | **Channel**   | Go 语言 CSP 模型实现                                                     |
 | **Scheduler** | CFS-Like 协作式异步调度器                                                |
-| **TaskScope** | 结构化并发作用域                                                         |
+| **TaskScope** | 结构化并发管理器                                                         |
 
 ### ⏰ MockClock — 模拟时钟
 
@@ -53,7 +53,7 @@
 
 - 类型安全的 `curry` / `pipe`（支持占位符和深层推导）
 - 高性能 `debounce` / `throttle`（边缘处理比`lodash`更健壮）
-- 深拷贝 `cloneDeep`（支持循环引用，手写栈实现，十万级嵌套）
+- 深拷贝 `cloneDeep`（支持循环引用，手写栈，支持十万级嵌套）
 - 常用类型工具、数组、对象、函数、字符串、Map/Set 工具函数
 
 ### 🌐 FetchQ — HTTP 客户端
@@ -70,7 +70,7 @@
 | ---------------- | ------------------------------------------------------------------------ |
 | **Other**        | 常用数据结构（Deque、Heap、Queue、Stack、DisjointSet）及工具函数         |
 | **Resource**     | 基于 `using` 的 RAII 资源管理器                                          |
-| **Flow**         | 类似 RxJS 的响应式原语，支持控制权反转                                   |
+| **Flow**         | 响应式流（类似 RxJS），通过 consume 方法实现控制权反转                   |
 | **EventEmitter** | 跨平台 EventEmitter，行为几乎无异的同时多项性能指标优于 Node.js 原生模块 |
 
 ## 安装
@@ -127,13 +127,20 @@ if (isOk(result)) {
 ```typescript
 import * as f from 'modern-ts/Fit';
 
+interface User {
+  name: string;
+  age: number;
+  tags: string[];
+}
+
 const UserSchema = f
-  .fit<{name: string; age: number; tags: string[]} | 'VIP'>()
+  .fit<User | 'VIP'>()
   .off((v) => v === 'VIP', 'ok') // 如果是VIP，直接短路返回ok
   .toShaped({
     name: f.String().that(f.min_len(2)),
     age: f.Number().that(f.range(0, 150)),
     tags: f.items(f.String()),
+    // 若字段和User不匹配，编译会报错
   });
 
 const result = f.validate({name: 'Alice', age: 25, tags: ['dev']}, UserSchema);
@@ -195,25 +202,25 @@ await Promise.all([
 
 ## 子路径导出
 
-| 路径                    | 说明               |
-| ----------------------- | ------------------ |
-| `modern-ts/Result`      | Result 错误处理    |
-| `modern-ts/Maybe`       | Maybe 可选值       |
-| `modern-ts/Reader`      | Reader 依赖注入    |
-| `modern-ts/ReaderT`     | ReaderT 单子转换器 |
-| `modern-ts/Resource`    | RAII 资源管理      |
-| `modern-ts/TxScope`     | RAII 事务作用域    |
-| `modern-ts/Lazy`        | 延迟计算           |
-| `modern-ts/LiteQ`       | 轻量级队列         |
-| `modern-ts/Fit`         | Schema 验证        |
-| `modern-ts/VirtualTime` | 虚拟时间           |
-| `modern-ts/Concurrent`  | 并发原语           |
-| `modern-ts/Reactive`    | 响应式原语         |
-| `modern-ts/Utils`       | 工具函数           |
-| `modern-ts/Arr`         | 数组工具           |
-| `modern-ts/Str`         | 字符串工具         |
-| `modern-ts/Sets`        | Set 工具           |
-| `modern-ts/Maps`        | Map 工具           |
+| 路径                    | 说明            |
+| ----------------------- | --------------- |
+| `modern-ts/Result`      | Result 错误处理 |
+| `modern-ts/Maybe`       | Maybe 可选值    |
+| `modern-ts/Reader`      | Reader 依赖注入 |
+| `modern-ts/ReaderT`     | Reader + Result |
+| `modern-ts/Resource`    | RAII 资源管理   |
+| `modern-ts/TxScope`     | RAII 事务作用域 |
+| `modern-ts/Lazy`        | 延迟计算        |
+| `modern-ts/FetchQ`      | HTTP 客户端     |
+| `modern-ts/Fit`         | Schema 验证     |
+| `modern-ts/VirtualTime` | 虚拟时间        |
+| `modern-ts/Concurrent`  | 并发原语        |
+| `modern-ts/Reactive`    | 响应式原语      |
+| `modern-ts/Utils`       | 工具函数        |
+| `modern-ts/Arr`         | 数组工具        |
+| `modern-ts/Str`         | 字符串工具      |
+| `modern-ts/Sets`        | Set 工具        |
+| `modern-ts/Maps`        | Map 工具        |
 
 ## API 文档
 

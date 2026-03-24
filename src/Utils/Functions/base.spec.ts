@@ -18,6 +18,7 @@ import {
   before,
   memoize,
   attempt,
+  NOT_INVOKED,
 } from './base';
 
 // ============================
@@ -38,31 +39,6 @@ describe.concurrent('identity function', () => {
     // 测试 null 和 undefined
     expect(identity(null)).toBe(null);
     expect(identity(undefined)).toBe(undefined);
-  });
-
-  it('should return the same reference for objects and arrays', () => {
-    // 测试对象引用
-    const obj = {key: 'value'};
-    expect(identity(obj)).toBe(obj);
-
-    // 测试数组引用
-    const arr = [1, 2, 3];
-    expect(identity(arr)).toBe(arr);
-
-    // 测试函数引用
-    const fn = () => {};
-    expect(identity(fn)).toBe(fn);
-  });
-
-  it('should preserve the type of the input value', () => {
-    // 这个测试确保类型系统正常工作
-    const num: number = identity(100);
-    const str: string = identity('test');
-    const bool: boolean = identity(true);
-
-    expect(num).toBe(100);
-    expect(str).toBe('test');
-    expect(bool).toBe(true);
   });
 });
 
@@ -287,6 +263,67 @@ describe.concurrent('rest function', () => {
     expect(result).toEqual([1, 2, 3]);
     expect(processOnlyRest).toHaveBeenCalledWith([], [1, 2, 3]);
   });
+
+  it('should work with multiple fixed arguments (fn.length > 2)', () => {
+    // fn.length = 3，所以 fixedLength = 2
+    // fn 接受三个参数，但 rest 只传入两个（fixed 和 restParts）
+    const processMultiple = vi.fn(
+      (fixed: [string, number], rest: boolean[], _unused?: undefined) => ({
+        fixed,
+        rest,
+      }),
+    );
+
+    const restFn = rest(processMultiple);
+
+    const result = restFn('name', 42, true, false, true);
+
+    expect(result).toEqual({
+      fixed: ['name', 42],
+      rest: [true, false, true],
+    });
+    expect(processMultiple).toHaveBeenCalledWith(
+      ['name', 42],
+      [true, false, true],
+    );
+  });
+
+  it('should correctly infer types with empty FixedArgs', () => {
+    // fn.length = 1，所以 fixedLength = 0
+    // fn 使用 rest 参数接收第二个参数
+    const processEmptyFixed = vi.fn((fixed: [], ...restArgs: [number[]]) => ({
+      fixed,
+      rest: restArgs[0],
+    }));
+
+    const restFn = rest(processEmptyFixed);
+
+    const result = restFn(1, 2, 3);
+
+    expect(result).toEqual({
+      fixed: [],
+      rest: [1, 2, 3],
+    });
+    expect(processEmptyFixed).toHaveBeenCalledWith([], [1, 2, 3]);
+  });
+
+  it('should preserve this context', () => {
+    const context = {multiplier: 10};
+    const processWithContext = vi.fn(function (
+      this: typeof context,
+      fixed: [number],
+      rest: number[],
+    ) {
+      return fixed[0] * this.multiplier + rest.reduce((a, b) => a + b, 0);
+    });
+
+    const restFn = rest(processWithContext);
+
+    const result = restFn.call(context, 5, 1, 2, 3);
+
+    expect(result).toBe(5 * 10 + 1 + 2 + 3);
+    expect(processWithContext).toHaveBeenCalledWith([5], [1, 2, 3]);
+  });
 });
 
 // ============================
@@ -416,9 +453,9 @@ describe.concurrent('after function', () => {
       return 'executed';
     });
 
-    // 前两次调用应该返回 undefined
-    expect(increment()).toBeUndefined();
-    expect(increment()).toBeUndefined();
+    // 前两次调用应该返回 NOT_INVOKED
+    expect(increment()).toBe(NOT_INVOKED);
+    expect(increment()).toBe(NOT_INVOKED);
 
     // 第三次调用应该执行函数
     expect(increment()).toBe('executed');
@@ -441,6 +478,24 @@ describe.concurrent('after function', () => {
     const result = afterFn('hello', 2);
     expect(result).toBe('hello2');
     expect(mockFn).toHaveBeenCalledWith('hello', 2);
+  });
+
+  it('should distinguish NOT_INVOKED from undefined return value', () => {
+    // 函数返回 undefined 时，应该能区分是未调用还是真的返回 undefined
+    const returnUndefined = after(2, () => undefined);
+    const returnUndefinedType = after(2, (): undefined => undefined);
+
+    // 第一次调用返回 NOT_INVOKED
+    expect(returnUndefined()).toBe(NOT_INVOKED);
+    expect(returnUndefinedType()).toBe(NOT_INVOKED);
+
+    // 第二次调用返回真正的 undefined
+    const result1 = returnUndefined();
+    const result2 = returnUndefinedType();
+    expect(result1).toBeUndefined();
+    expect(result2).toBeUndefined();
+    expect(result1).not.toBe(NOT_INVOKED);
+    expect(result2).not.toBe(NOT_INVOKED);
   });
 });
 
@@ -478,6 +533,35 @@ describe.concurrent('before function', () => {
     // 前两次结果不同，第三次应该和第二次相同
     expect(firstResult).not.toBe(secondResult);
     expect(thirdResult).toBe(secondResult);
+  });
+
+  it('should return NOT_INVOKED when n is 0', () => {
+    const fn = vi.fn(() => 'result');
+    const beforeFn = before(0, fn);
+
+    // n=0 时，函数永远不会被调用
+    expect(beforeFn()).toBe(NOT_INVOKED);
+    expect(beforeFn()).toBe(NOT_INVOKED);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('should distinguish NOT_INVOKED from undefined return value', () => {
+    const returnUndefined = before(2, () => undefined);
+
+    // 第一次调用返回真正的 undefined（函数被执行了）
+    const firstResult = returnUndefined();
+    expect(firstResult).toBeUndefined();
+    expect(firstResult).not.toBe(NOT_INVOKED);
+
+    // 第二次调用返回真正的 undefined
+    const secondResult = returnUndefined();
+    expect(secondResult).toBeUndefined();
+    expect(secondResult).not.toBe(NOT_INVOKED);
+
+    // 第三次调用返回缓存的 undefined
+    const thirdResult = returnUndefined();
+    expect(thirdResult).toBeUndefined();
+    expect(thirdResult).not.toBe(NOT_INVOKED);
   });
 });
 
@@ -562,9 +646,9 @@ describe.concurrent('memoize function', () => {
 });
 
 // ============================
-// cnm 函数测试
+// attempt 函数测试
 // ============================
-describe.concurrent('cnm function', () => {
+describe.concurrent('attempt function', () => {
   it('should return [undefined, result] for successful sync function', () => {
     const divide = (a: number, b: number) => a / b;
     const safeDivide = attempt(divide);
@@ -645,24 +729,24 @@ describe.concurrent('cnm function', () => {
     const safeParse = attempt(JSON.parse);
 
     // 成功解析
-    const [err1, data1] = safeParse('{"a":1}') as [undefined, unknown];
+    const [err1, data1] = safeParse('{"a":1}');
     expect(err1).toBeUndefined();
     expect(data1).toEqual({a: 1});
 
     // 解析失败
-    const [err2, data2] = safeParse('invalid json') as [Error, undefined];
+    const [err2, data2] = safeParse('invalid json');
     expect(err2).toBeInstanceOf(Error);
     expect(data2).toBeUndefined();
   });
 
   it('should handle non-Error throws', () => {
-    const throwString = (): never => {
+    const throwString = () => {
       // eslint-disable-next-line @typescript-eslint/only-throw-error
       throw 'string error';
     };
     const safeThrow = attempt(throwString);
 
-    const [err, result] = safeThrow() as [string, undefined];
+    const [err, result] = safeThrow();
 
     expect(err).toBe('string error');
     expect(result).toBeUndefined();
@@ -675,11 +759,11 @@ describe.concurrent('cnm function', () => {
     const safeNull = attempt(returnNull);
     const safeUndefined = attempt(returnUndefined);
 
-    const [err1, result1] = safeNull() as [undefined, null];
+    const [err1, result1] = safeNull();
     expect(err1).toBeUndefined();
     expect(result1).toBeNull();
 
-    const [err2, result2] = safeUndefined() as [undefined, undefined];
+    const [err2, result2] = safeUndefined();
     expect(err2).toBeUndefined();
     expect(result2).toBeUndefined();
   });

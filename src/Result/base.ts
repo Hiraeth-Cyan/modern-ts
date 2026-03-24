@@ -118,10 +118,7 @@ export function safeExecute<T, E = never>(
     const value = fn();
     return Ok(value);
   } catch (raw_error) {
-    if (isExpectedError && isExpectedError(raw_error)) {
-      return Err(raw_error);
-    }
-
+    if (isExpectedError && isExpectedError(raw_error)) return Err(raw_error);
     return Err(UnknownError.from(raw_error, message));
   }
 }
@@ -162,9 +159,7 @@ export async function safeExecuteAsync<T, E = never>(
     const value = await async_fn();
     return Ok(value);
   } catch (raw_error) {
-    if (isExpectedError && isExpectedError(raw_error)) {
-      return Err(raw_error);
-    }
+    if (isExpectedError && isExpectedError(raw_error)) return Err(raw_error);
     return Err(UnknownError.from(raw_error, message));
   }
 }

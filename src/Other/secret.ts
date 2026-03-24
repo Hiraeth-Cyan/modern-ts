@@ -23,9 +23,8 @@ export class SecretError extends Error {
  * to protect data from accidental exposure in logs, serialization, and memory dumps.
  *
  * @template T The type of the sensitive value being protected.
- * @implements {Disposable} (Implicitly, for TypeScript 5.2+ `using` support)
  */
-export class Secret<T> {
+export class Secret<T> implements Disposable {
   /**
    * The private field storing the sensitive value or the `EMPTY` Symbol if destroyed.
    * This is the core mechanism to prevent serialization and accidental console logging.

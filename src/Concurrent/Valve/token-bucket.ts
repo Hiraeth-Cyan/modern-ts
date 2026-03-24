@@ -102,8 +102,7 @@ export class TokenBucket {
   /**
    * Resets the rate limit configuration.
    *
-   * @param limit - The new token capacity limit
-   * @param interval - The new refill interval in milliseconds
+   * @param config - The new rate limit configuration
    */
   public resetRate(config: TokenBucketConfig): void {
     const {limit, interval} = config;

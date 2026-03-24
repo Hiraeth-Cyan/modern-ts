@@ -10,8 +10,8 @@ import type {Maybe} from './types';
 
 /**
  * Transforms the contained value if Some, returns None otherwise.
- * @typeparam T - Original value type
- * @typeparam R - Result type
+ * @template T - Original value type
+ * @template R - Result type
  * @param val - Maybe value
  * @param fn - Transformation function
  * @returns Maybe<R>
@@ -21,8 +21,8 @@ export const map = <T, R>(val: Maybe<T>, fn: (value: T) => R): Maybe<R> =>
 
 /**
  * Chains computations that may fail. If Some, applies fn, otherwise returns None.
- * @typeparam T - Original value type
- * @typeparam R - Result type
+ * @template T - Original value type
+ * @template R - Result type
  * @param val - Maybe value
  * @param fn - Function returning Maybe<R>
  * @returns Maybe<R>
@@ -34,8 +34,8 @@ export const andThen = <T, R>(
 
 /**
  * Applies a Maybe-wrapped function to a Maybe value.
- * @typeparam T - Input type
- * @typeparam R - Result type
+ * @template T - Input type
+ * @template R - Result type
  * @param fn_val - Maybe<(v: T) => R>
  * @param val - Maybe<T>
  * @returns Maybe<R>
@@ -47,7 +47,7 @@ export const ap = <T, R>(
 
 /**
  * Returns Some if value satisfies predicate, None otherwise.
- * @typeparam T - Value type
+ * @template T - Value type
  * @param val - Maybe value
  * @param predicate - Filter condition
  * @returns Maybe<T>
@@ -59,8 +59,8 @@ export const filter = <T>(
 
 /**
  * Maps value if predicate passes, returns None otherwise.
- * @typeparam T - Original type
- * @typeparam R - Result type
+ * @template T - Original type
+ * @template R - Result type
  * @param val - Maybe value
  * @param predicate - Condition to check
  * @param fn - Transformation function
@@ -78,8 +78,8 @@ export const mapIf = <T, R>(
 
 /**
  * Returns other if val is Some, None otherwise.
- * @typeparam T - First type
- * @typeparam U - Second type
+ * @template T - First type
+ * @template U - Second type
  * @param val - Maybe<T>
  * @param other - Maybe<U>
  * @returns Maybe<U>
@@ -89,7 +89,7 @@ export const and = <T, U>(val: Maybe<T>, other: Maybe<U>): Maybe<U> =>
 
 /**
  * Returns first Some value, otherwise other.
- * @typeparam T - Value type
+ * @template T - Value type
  * @param val - First Maybe
  * @param other - Fallback Maybe
  * @returns Maybe<T>
@@ -99,7 +99,7 @@ export const or = <T>(val: Maybe<T>, other: Maybe<T>): Maybe<T> =>
 
 /**
  * Returns val if Some, otherwise calls fn for fallback.
- * @typeparam T - Value type
+ * @template T - Value type
  * @param val - Maybe value
  * @param fn - Fallback supplier
  * @returns Maybe<T>
@@ -109,8 +109,8 @@ export const orElse = <T>(val: Maybe<T>, fn: () => Maybe<T>): Maybe<T> =>
 
 /**
  * Extracts value or returns default.
- * @typeparam T - Input type
- * @typeparam R - Output type
+ * @template T - Input type
+ * @template R - Output type
  * @param val - Maybe value
  * @param initial - Default value
  * @param onSome - Handler for Some case
@@ -124,7 +124,7 @@ export const fold = <T, R>(
 
 /**
  * Checks if Maybe contains specific value.
- * @typeparam T - Value type
+ * @template T - Value type
  * @param val - Maybe value
  * @param x - Value to compare
  * @returns boolean
@@ -138,8 +138,8 @@ export const contains = <T>(val: Maybe<T>, x: T): boolean =>
 
 /**
  * Combines two Maybes into tuple if both are Some.
- * @typeparam T - First type
- * @typeparam U - Second type
+ * @template T - First type
+ * @template U - Second type
  * @param a - Maybe<T>
  * @param b - Maybe<U>
  * @returns Maybe<[T, U]>
@@ -149,9 +149,9 @@ export const zip = <T, U>(a: Maybe<T>, b: Maybe<U>): Maybe<[T, U]> =>
 
 /**
  * Applies function to two Maybes if both are Some.
- * @typeparam T - First type
- * @typeparam U - Second type
- * @typeparam R - Result type
+ * @template T - First type
+ * @template U - Second type
+ * @template R - Result type
  * @param ma - Maybe<T>
  * @param mb - Maybe<U>
  * @param fn - Combining function
@@ -169,7 +169,7 @@ export const zipWith = <T, U, R>(
 
 /**
  * Returns array of all values if all are Some, None otherwise.
- * @typeparam T - Element type
+ * @template T - Element type
  * @param vals - Array of Maybes
  * @returns Maybe<T[]>
  */
@@ -178,8 +178,8 @@ export const all = <T>(vals: readonly Maybe<T>[]): Maybe<T[]> =>
 
 /**
  * Maps array to Maybes, returns Some of results if all succeed.
- * @typeparam T - Input type
- * @typeparam U - Output type
+ * @template UT - Input type
+ * @template U - Output type
  * @param items - Input array
  * @param fn - Mapping function
  * @returns Maybe<U[]>
@@ -199,7 +199,7 @@ export const mapAll = <T, U>(
 
 /**
  * Partitions array into Some values and None count.
- * @typeparam T - Element type
+ * @template T - Element type
  * @param vals - Array of Maybes
  * @returns [T[], number] - [Some values, None count]
  */
@@ -215,7 +215,7 @@ export const partition = <T>(vals: readonly Maybe<T>[]): [T[], number] => {
 
 /**
  * Collects all Some values from array.
- * @typeparam T - Element type
+ * @template T - Element type
  * @param vals - Array of Maybes
  * @returns T[] - Only Some values
  */
@@ -227,7 +227,7 @@ export const collectSomes = <T>(vals: readonly Maybe<T>[]): T[] => {
 
 /**
  * Returns first Some value in array, None if none found.
- * @typeparam T - Element type
+ * @template T - Element type
  * @param vals - Array of Maybes
  * @returns Maybe<T>
  */
@@ -240,8 +240,8 @@ export const firstSome = <T>(vals: readonly Maybe<T>[]): Maybe<T> =>
 
 /**
  * Reduces array of Maybes. Returns None if any is None.
- * @typeparam T - Element type
- * @typeparam R - Result type
+ * @template T - Element type
+ * @template R - Result type
  * @param vals - Array of Maybes
  * @param initial - Initial value
  * @param reducer - Reduction function
@@ -262,8 +262,8 @@ export function reduce<T, R>(
 
 /**
  * Performs scan reduction. Returns None if any is None.
- * @typeparam T - Element type
- * @typeparam R - Result type
+ * @template T - Element type
+ * @template R - Result type
  * @param vals - Array of Maybes
  * @param initial - Initial value
  * @param scanner - Scanning function
@@ -286,8 +286,8 @@ export function scan<T, R>(
 
 /**
  * Folds with separate handlers for Some/None.
- * @typeparam T - Element type
- * @typeparam R - Result type
+ * @template T - Element type
+ * @template R - Result type
  * @param vals - Array of Maybes
  * @param initial - Initial value
  * @param onSome - Handler for Some values

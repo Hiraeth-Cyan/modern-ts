@@ -363,7 +363,6 @@ export const words = (str: string): string[] =>
 export const randomString = (length: number, charset?: string): string => {
   if (!Number.isInteger(length) || length < 0)
     throw new ParameterError('Length must be a non-negative integer');
-
   const chars =
     charset ?? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   if (chars.length === 0) return '';
@@ -374,8 +373,6 @@ export const randomString = (length: number, charset?: string): string => {
 
   return result;
 };
-
-
 
 // ------ 模板字符串 ------
 
@@ -398,7 +395,6 @@ export const template = <T extends Record<string, unknown>>(
     const trimmed_path = path.trim();
     const keys = trimmed_path.split('.');
     let current: unknown = data;
-
     for (const key of keys) {
       if (current === null || typeof current !== 'object') {
         current = undefined;
@@ -406,7 +402,6 @@ export const template = <T extends Record<string, unknown>>(
       }
       current = (current as Record<string, unknown>)[key];
     }
-
     if (current === undefined || current === null) return '';
     // eslint-disable-next-line @typescript-eslint/no-base-to-string
     return String(current);
