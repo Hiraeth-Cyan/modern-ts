@@ -12,7 +12,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.8.3",
+  "version": "0.8.4",
   "license": "Apache-2.0",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
@@ -148,7 +148,8 @@
     "build": "tsc --project tsconfig.build.json && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
