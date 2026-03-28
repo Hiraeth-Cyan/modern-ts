@@ -214,7 +214,7 @@ type RetryAction<R> =
  * @param result - The result to return.
  * @returns A RetryAction that stops retrying.
  */
-export const QStop = <T,>(result: Result<T, QError>) => ({result});
+export const QStop = <T>(result: Result<T, QError>) => ({result});
 
 /**
  * Continues retrying after a delay.
@@ -222,10 +222,10 @@ export const QStop = <T,>(result: Result<T, QError>) => ({result});
  * @param config - Optional modified request config for retry.
  * @returns A RetryAction that continues retrying.
  */
-export const QContinue = (delay: number, config?: RequestInit) => ({
-  delay,
-  config,
-});
+export const QContinue = (
+  delay: number,
+  config?: RequestInit,
+): RetryAction<never> => (config ? {delay, config} : {delay});
 
 /**
  * Function type for custom retry logic.
@@ -445,7 +445,7 @@ export class FetchQ<R = unknown> {
     // 设置 Accept 头，告诉服务器期望的响应格式
     if (!headers.has('Accept')) headers.set('Accept', ACCEPT_MAP[responseType]);
 
-    let body: BodyInit | undefined;
+    let body: BodyInit | null = null;
 
     if (data !== undefined && data !== null) {
       if (data instanceof FormData) {
@@ -468,9 +468,9 @@ export class FetchQ<R = unknown> {
         if (!headers.has('Content-Type'))
           headers.set('Content-Type', 'application/json');
       }
-    } else {
+    } else if (config.body) {
       // 没有提供 data 时，使用 config 中的 body
-      body = config.body as BodyInit | undefined;
+      body = config.body;
     }
 
     return {...config, headers, body};
@@ -579,7 +579,10 @@ export class FetchQ<R = unknown> {
         ...fetch_opts,
       };
       // 如果提供了 data 参数，忽略 Request 中的 body
-      if (data !== undefined) initial_config.body = undefined;
+      if (data !== undefined) {
+        const {body: _, ...rest} = initial_config;
+        initial_config = rest;
+      }
     } else {
       // URL 字符串：直接构建
       final_url = buildUrl(this.base_url, urlOrRequest, options.params);
@@ -743,7 +746,7 @@ export class FetchQ<R = unknown> {
       delay_time = Math.random() * capped_delay;
     }
 
-    return QContinue(delay_time);
+    return {delay: delay_time};
   }
 
   /**
@@ -797,14 +800,15 @@ export class FetchQ<R = unknown> {
       if (!response.ok) {
         const max_body_size =
           options.maxErrorBodySize ?? this.max_error_body_size;
-        const body = await this.limitErrorBody(response, max_body_size);
-        return Err({
+        const error_body = await this.limitErrorBody(response, max_body_size);
+        const http_error: QError = {
           type: 'http',
           status: response.status,
           message: `Request failed with status ${response.status}`,
           response,
-          body,
-        });
+        };
+        if (error_body !== undefined) http_error.body = error_body;
+        return Err(http_error);
       }
 
       // 下载进度追踪
@@ -1000,11 +1004,12 @@ export class FetchQ<R = unknown> {
       // 网络错误冒泡到 performFetch 由 classifyError 分类
       if (e instanceof TypeError || e instanceof DOMException) throw e;
       // JSON 解析错误等
-      return Err({
+      const parse_error: QError = {
         type: 'parse',
         message: e instanceof Error ? e.message : 'Parse error',
-        raw: raw_text,
-      });
+      };
+      if (raw_text !== undefined) parse_error.raw = raw_text;
+      return Err(parse_error);
     }
   }
 

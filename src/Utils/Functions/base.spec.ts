@@ -6,19 +6,17 @@ import {
   identity,
   noop,
   asyncNoop,
-  unary,
   negate,
   once,
-  ary,
   rest,
   spread,
-  partial,
-  partialRight,
   after,
   before,
   memoize,
   attempt,
   NOT_INVOKED,
+  defer,
+  DEFER_NO_ERROR,
 } from './base';
 
 // ============================
@@ -58,40 +56,6 @@ describe.concurrent('noop and asyncNoop functions', () => {
 
     // Promise 应该解析为 undefined
     await expect(result).resolves.toBeUndefined();
-  });
-});
-
-// ============================
-// unary 函数测试
-// ============================
-describe.concurrent('unary function', () => {
-  it('should call the original function with only the first argument', () => {
-    // 创建一个会收集所有参数的函数
-    const mockFn = vi.fn((...args) => args.length);
-    const unaryFn = unary(mockFn);
-
-    // 调用一元化函数
-    const result = unaryFn('first');
-
-    // 应该只接收第一个参数
-    expect(result).toBe(1);
-    expect(mockFn).toHaveBeenCalledWith('first');
-    expect(mockFn).not.toHaveBeenCalledWith('first', 'second', 'third');
-  });
-
-  it('should preserve the return type of the original function', () => {
-    // 测试不同类型的返回值
-    const stringFn = unary((x: string) => x.toUpperCase());
-    expect(stringFn('hello')).toBe('HELLO');
-
-    const numberFn = unary((x: number) => x * 2);
-    expect(numberFn(5)).toBe(10);
-
-    const objectFn = unary((x: {value: number}) => ({
-      ...x,
-      value: x.value + 1,
-    }));
-    expect(objectFn({value: 10})).toEqual({value: 11});
   });
 });
 
@@ -174,40 +138,6 @@ describe.concurrent('once function', () => {
 
     expect(obj1).toBe(obj2); // 应该是同一个对象引用
     expect(obj1.id).toBe(obj2.id);
-  });
-});
-
-// ============================
-// ary 函数测试
-// ============================
-describe.concurrent('ary function', () => {
-  it('should call function with only first n arguments', () => {
-    // 创建一个收集所有参数的函数
-    const collectArgs = vi.fn((...args: unknown[]) => args.length);
-
-    // 限制为前 2 个参数
-    const ary2 = ary(collectArgs, 2);
-
-    // 调用时传入 4 个参数
-    const result = ary2('a', 'b', 'c', 'd');
-
-    // 应该只接收前 2 个参数
-    expect(result).toBe(2);
-    expect(collectArgs).toHaveBeenCalledWith('a', 'b');
-  });
-
-  it('should handle edge cases for n', () => {
-    const mockFn = vi.fn((...args: unknown[]) => args);
-
-    // n = 0，不传递任何参数
-    const ary0 = ary(mockFn, 0);
-    ary0('a', 'b', 'c');
-    expect(mockFn).toHaveBeenCalledWith(); // 空参数列表
-
-    // n 大于实际参数数量
-    const ary5 = ary(mockFn, 5);
-    ary5('a', 'b');
-    expect(mockFn).toHaveBeenCalledWith('a', 'b'); // 只传递实际存在的参数
   });
 });
 
@@ -360,85 +290,6 @@ describe.concurrent('spread function', () => {
       age: 30,
       active: true,
     });
-  });
-});
-
-// ============================
-// partial 函数测试
-// ============================
-describe.concurrent('partial function', () => {
-  it('should prepend fixed arguments to function calls', () => {
-    // 创建一个接受三个参数的函数
-    const greet = vi.fn(
-      (greeting: string, name: string, punctuation: string) =>
-        `${greeting}, ${name}${punctuation}`,
-    );
-
-    // 固定前两个参数
-    const partialGreet = partial(greet, 'Hello', 'Alice');
-
-    // 只需要提供剩余的参数
-    const result = partialGreet('!');
-
-    expect(result).toBe('Hello, Alice!');
-    expect(greet).toHaveBeenCalledWith('Hello', 'Alice', '!');
-  });
-
-  it('should work with multiple remaining arguments', () => {
-    const joinValues = vi.fn(
-      (prefix: string, a: number, b: number, c: number) =>
-        `${prefix}: ${a}, ${b}, ${c}`,
-    );
-
-    const partialJoin = partial(joinValues, 'Numbers');
-    const result = partialJoin(1, 2, 3);
-
-    expect(result).toBe('Numbers: 1, 2, 3');
-  });
-
-  it('should handle empty fixed arguments', () => {
-    // 测试不固定任何参数的情况
-    const identityPartial = partial(identity, 'test');
-    const result = identityPartial();
-
-    expect(result).toBe('test');
-  });
-});
-
-// ============================
-// partialRight 函数测试
-// ============================
-describe.concurrent('partialRight function', () => {
-  it('should append fixed arguments to function calls', () => {
-    // 创建一个接受三个参数的函数
-    const formatMessage = vi.fn(
-      (name: string, action: string, target: string) =>
-        `${name} ${action} ${target}`,
-    );
-
-    // 固定后两个参数
-    const partialRightFormat = partialRight(
-      formatMessage,
-      'ran to',
-      'the store',
-    );
-
-    // 只需要提供第一个参数
-    const result = partialRightFormat('Alice');
-
-    expect(result).toBe('Alice ran to the store');
-    expect(formatMessage).toHaveBeenCalledWith('Alice', 'ran to', 'the store');
-  });
-
-  it('should work with multiple initial arguments', () => {
-    const calculate = vi.fn(
-      (a: number, b: number, c: number, d: number) => a + b + c + d,
-    );
-
-    const partialRightCalc = partialRight(calculate, 3, 4);
-    const result = partialRightCalc(1, 2);
-
-    expect(result).toBe(10); // 1 + 2 + 3 + 4
   });
 });
 
@@ -596,7 +447,7 @@ describe.concurrent('memoize function', () => {
         callCount++;
         return `${obj.name}#${obj.id}`;
       },
-      (obj) => obj.id, // 只根据 id 缓存
+      {getCacheKey: (obj) => obj.id}, // 只根据 id 缓存
     );
 
     const obj1 = {id: 1, name: 'Alice'};
@@ -766,5 +617,222 @@ describe.concurrent('attempt function', () => {
     const [err2, result2] = safeUndefined();
     expect(err2).toBeUndefined();
     expect(result2).toBeUndefined();
+  });
+});
+
+// ============================
+// defer 函数测试
+// ============================
+describe.concurrent('defer function', () => {
+  describe('basic functionality', () => {
+    it('should execute sync/async task and return result', async () => {
+      const sync_result = await defer(() => 'success');
+      expect(sync_result).toBe('success');
+
+      const async_result = await defer(() => 'async success');
+      expect(async_result).toBe('async success');
+    });
+
+    it('should execute callbacks in LIFO order', async () => {
+      const order: number[] = [];
+      const result = await defer((register) => {
+        register(() => order.push(1));
+        register(() => order.push(2));
+        register(() => order.push(3));
+        return 'result';
+      });
+      expect(result).toBe('result');
+      expect(order).toEqual([3, 2, 1]);
+    });
+  });
+
+  describe('error handling', () => {
+    it('should throw task error when task fails', async () => {
+      const task_error = new Error('Task failed');
+      const callback_spy = vi.fn();
+
+      try {
+        await defer((register) => {
+          register(callback_spy);
+          throw task_error;
+        });
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect(e).toBe(task_error);
+        expect(callback_spy).toHaveBeenCalledWith(task_error);
+      }
+    });
+
+    it('should throw AggregateError when task and callbacks fail', async () => {
+      const task_error = new Error('Task failed');
+      const callback_error = new Error('Callback failed');
+
+      try {
+        await defer((register) => {
+          register(() => {
+            throw callback_error;
+          });
+          throw task_error;
+        });
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(AggregateError);
+        const agg = e as AggregateError;
+        expect(agg.errors).toContain(task_error);
+        expect(agg.errors).toContain(callback_error);
+        expect(agg.message).toBe('defer: task and callbacks failed');
+      }
+    });
+
+    it('should throw AggregateError when multiple callbacks fail', async () => {
+      const error1 = new Error('Callback 1 failed');
+      const error2 = new Error('Callback 2 failed');
+      const error3 = new Error('Callback 3 failed');
+
+      try {
+        await defer((register) => {
+          register(() => {
+            throw error1;
+          });
+          register(() => {
+            throw error2;
+          });
+          register(() => {
+            throw error3;
+          });
+          return 'success';
+        });
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(AggregateError);
+        const agg = e as AggregateError;
+        expect(agg.errors).toContain(error1);
+        expect(agg.errors).toContain(error2);
+        expect(agg.errors).toContain(error3);
+        expect(agg.message).toBe('defer: callbacks failed');
+      }
+    });
+
+    it('should throw AggregateError when single callback fails', async () => {
+      const callback_error = new Error('Callback failed');
+
+      try {
+        await defer((register) => {
+          register(() => {
+            throw callback_error;
+          });
+          return 'success';
+        });
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(AggregateError);
+        const agg = e as AggregateError;
+        expect(agg.errors).toHaveLength(1);
+        expect(agg.errors[0]).toBe(callback_error);
+        expect(agg.message).toBe('defer: callbacks failed');
+      }
+    });
+  });
+
+  describe('callback execution', () => {
+    it('should pass DEFER_NO_ERROR to callbacks when task succeeds', async () => {
+      let received_error: unknown;
+      await defer((register) => {
+        register((error) => {
+          received_error = error;
+        });
+        return 'success';
+      });
+      expect(received_error).toBe(DEFER_NO_ERROR);
+    });
+
+    it('should pass task error to callbacks when task fails', async () => {
+      const task_error = new Error('Task error');
+      let received_error: unknown;
+      const callback_spy = vi.fn((error) => {
+        received_error = error;
+      });
+
+      try {
+        await defer((register) => {
+          register(callback_spy);
+          throw task_error;
+        });
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect(e).toBe(task_error);
+      }
+      expect(received_error).toBe(task_error);
+    });
+
+    it('should continue executing callbacks even if one fails', async () => {
+      const order: number[] = [];
+      const error1 = new Error('Error 1');
+      const error2 = new Error('Error 2');
+
+      try {
+        await defer((register) => {
+          register(() => {
+            order.push(1);
+            throw error1;
+          });
+          register(() => {
+            order.push(2);
+          });
+          register(() => {
+            order.push(3);
+            throw error2;
+          });
+          return 'success';
+        });
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(AggregateError);
+      }
+      expect(order).toEqual([3, 2, 1]);
+    });
+  });
+
+  describe('resource management pattern', () => {
+    it('should cleanup resources in LIFO order', async () => {
+      const cleanup_log: string[] = [];
+      const result = await defer((register) => {
+        register(() => cleanup_log.push('cleanup1'));
+        register(() => cleanup_log.push('cleanup2'));
+        register(() => cleanup_log.push('cleanup3'));
+        return 'result';
+      });
+      expect(result).toBe('result');
+      expect(cleanup_log).toEqual(['cleanup3', 'cleanup2', 'cleanup1']);
+    });
+
+    it('should cleanup resources even when task fails', async () => {
+      const cleanup_log: string[] = [];
+      const task_error = new Error('Task failed');
+
+      try {
+        await defer((register) => {
+          register(() => cleanup_log.push('cleanup1'));
+          register(() => cleanup_log.push('cleanup2'));
+          throw task_error;
+        });
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect(e).toBe(task_error);
+      }
+      expect(cleanup_log).toEqual(['cleanup2', 'cleanup1']);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle no callbacks registered', async () => {
+      const result = await defer(() => 'no callbacks');
+      expect(result).toBe('no callbacks');
+    });
+
+    it('should handle task returning undefined', async () => {
+      const result = await defer(() => undefined);
+      expect(result).toBeUndefined();
+    });
   });
 });

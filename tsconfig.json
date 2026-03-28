@@ -2,9 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "declarationDir": "./dist/types",
-    "outDir": "./dist",
 
-    "baseUrl": ".",
     "paths": {
       "src/*": ["./src/*"]
     },
@@ -29,6 +27,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
+    "exactOptionalPropertyTypes": true,
     "emitDeclarationOnly": true
   },
   "include": ["src/**/*", "__benchmark__/**/*", "__examples__/**/*"],

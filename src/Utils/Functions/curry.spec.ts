@@ -14,7 +14,6 @@ const formatMessage = (
   count: number,
 ) => `${prefix}: ${message} ${suffix} (${count})`;
 const asyncAdd = async (a: number, b: number) => Promise.resolve(a + b);
-const identity = (x: number) => x;
 const fiveArgs = (a: number, b: number, c: number, d: number, e: number) =>
   a + b + c + d + e;
 
@@ -25,31 +24,7 @@ function withDefaults(a: number, b: number = 10, c: number = 20) {
 
 describe.concurrent('Curry Function (Runtime)', () => {
   // ========================================
-  // 1. 初始校验与异常 (Initial Validation)
-  // ========================================
-  it('should throw error for invalid length (non-positive integer)', () => {
-    expect(() => curry(add, 0)).toThrow(
-      'Invalid length: Expected a positive integer, but received 0.',
-    );
-    expect(() => curry(add, -1)).toThrow(
-      'Invalid length: Expected a positive integer, but received -1.',
-    );
-    expect(() => curry(add, 3.5)).toThrow(
-      'Invalid length: Expected a positive integer, but received 3.5.',
-    );
-    expect(() => curry(add, NaN)).toThrow(
-      'Invalid length: Expected a positive integer, but received NaN.',
-    );
-  });
-
-  it('should handle length 1 function (identity)', () => {
-    const curriedIdentity = curry(identity, 1);
-    expect(curriedIdentity(5)).toBe(5);
-    expect(curriedIdentity(10)).toBe(10);
-  });
-
-  // ========================================
-  // 2. 基本柯里化调用 (Basic Execution)
+  // 1. 基本柯里化调用 (Basic Execution)
   // ========================================
 
   it('should execute when all arguments are provided in the first call', () => {
@@ -153,12 +128,12 @@ describe.concurrent('Curry Function (Runtime)', () => {
   });
 
   it('should handle functions with default/optional params based on length', () => {
-    // kRequiredLength = 1
-    const curriedWithLength = curry(withDefaults, 1);
+    // RequiredLength = 2
+    const curriedWithLength = curry(withDefaults, 2);
 
-    // 调用 (1) -> 满足 length=1，执行 withDefaults(1, undefined, undefined)
-    // 实际执行 (1, 10, 20) -> 31
-    expect(curriedWithLength(1)).toBe(31);
+    // 调用 (1, 2) -> 满足 length=2，执行 withDefaults(1, 2, undefined)
+    // 实际执行 (1, 2, 20) -> 23
+    expect(curriedWithLength(1, 2)).toBe(23);
 
     // kRequiredLength = 3
     const curriedDefaults3 = curry(withDefaults, 3);
@@ -166,10 +141,14 @@ describe.concurrent('Curry Function (Runtime)', () => {
     // 调用 (1, 2, 3) -> 满足 length=3，执行 withDefaults(1, 2, 3) -> 6
     expect(curriedDefaults3(1, 2, 3)).toBe(6);
 
+    // 触发默认值
+    expect(curriedDefaults3(1, undefined, 3)).toBe(14);
+    expect(curriedDefaults3(1)(undefined)(3)).toBe(14);
     // 调用 (1)(2) -> 返回函数
     expect(typeof curriedDefaults3(1)(2)).toBe('function');
 
     // 调用 (1)(2)(3) -> 6
+
     expect(curriedDefaults3(1)(2)(3)).toBe(6);
 
     // 调用 (1, __, 3)(2) -> 6
@@ -220,16 +199,10 @@ describe.concurrent('Rest parameters (variadic functions)', () => {
   const formatNumbers = (prefix: string, ...nums: number[]) =>
     `${prefix}: [${nums.join(', ')}]`;
 
-  it('should handle rest parameters function with length=0 (throws error)', () => {
-    expect(() => curry(sumAll, 0)).toThrow(
-      'Invalid length: Expected a positive integer, but received 0.',
-    );
-  });
-
-  it('should handle rest parameters with length=1', () => {
-    const curriedSum = curry(sumAll, 1);
-    expect(curriedSum(5)).toBe(5);
-    expect(curriedSum(10)).toBe(10);
+  it('should handle rest parameters with length=2', () => {
+    const curriedSum = curry(sumAll, 2);
+    expect(curriedSum(5, 10)).toBe(15);
+    expect(curriedSum(5)(10)).toBe(15);
   });
 
   it('should handle rest parameters with length=3', () => {
@@ -320,21 +293,12 @@ describe.concurrent('Rest parameters (variadic functions)', () => {
     expect(spyFn).toHaveBeenCalledWith(1, 2, 3);
   });
 
-  it('should slice arguments to length for rest params', () => {
-    // 当提供的参数超过 length 时，应该只取前 length 个
-    const curriedSum = curry(sumAll, 3);
-
-    // 提供超过 3 个参数，应该只取前 3 个
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
-    expect((curriedSum as any)(1, 2, 3, 4, 5)).toBe(6); // 只用 1+2+3
-  });
-
   it('should handle empty array result for rest params', () => {
     // 创建一个返回数组的可变参数函数
     const collect = (...items: number[]) => items;
-    const curriedCollect = curry(collect, 1);
+    const curriedCollect = curry(collect, 2);
 
-    expect(curriedCollect(42)).toEqual([42]);
+    expect(curriedCollect(42, 100)).toEqual([42, 100]);
   });
 
   it('should handle rest params with object arguments', () => {

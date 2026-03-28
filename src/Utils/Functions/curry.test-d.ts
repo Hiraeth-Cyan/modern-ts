@@ -11,18 +11,17 @@ import {curry, __} from './curry';
 // 🐱 基础柯里化测试
 // ===================================================================
 
-const add = (a: number, b: number, c: number) => a + b + c;
+// @ts-expect-error: 参数类型应为 AnyFunction 喵～
+curry('不是函数', 1);
+
+declare const add: (a: number, b: number, c: number) => number;
 const curriedAdd = curry(add, 3);
 
 // -- 全参数调用 --
 expectIdentical<number>()(curriedAdd(1, 2, 3));
-// @ts-expect-error: 结果是 number，不能赋值给 string 喵～
-expectIdentical<string>()(curriedAdd(1, 2, 3));
 
 // -- 分段调用 --
 expectIdentical<number>()(curriedAdd(1)(2)(3));
-// @ts-expect-error: 结果是 number 喵～
-expectIdentical<string>()(curriedAdd(1)(2)(3));
 
 // -- 混合调用方式 --
 const partial1 = curriedAdd(1);
@@ -32,6 +31,10 @@ expectIdentical<number>()(partial1(2)(3));
 // -- 参数溢出检测 --
 // @ts-expect-error: 参数已填满，不能再调用了喵！
 curriedAdd(__, 2, __)(__, 3, 4);
+
+const singleAdd = curriedAdd(1)(2);
+expectIdentical<(arg: number) => number>()(singleAdd);
+expectIdentical<number>()(singleAdd(3));
 
 // ===================================================================
 // 🎀 占位符魔法测试
@@ -96,14 +99,14 @@ curriedAdd({meow: '?'}, [1, 2, 3], () => {});
 // ===================================================================
 
 // -- 异步函数 --
-const asyncAdd = async (a: number, b: number) => Promise.resolve(a + b);
+declare const asyncAdd: (a: number, b: number) => Promise<number>;
 const curriedAsync = curry(asyncAdd, 2);
 // @ts-expect-error: 返回值是 Promise<number> 喵～
 expectIdentical<number>()(curriedAsync(1)(2));
 expectIdentical<Promise<number>>()(curriedAsync(1)(2));
 
 // -- 可变参数函数 --
-const sumAll = (...args: number[]) => args.reduce((a, b) => a + b, 0);
+declare const sumAll: (...args: number[]) => number;
 const curriedSum = curry(sumAll, 3);
 expectIdentical<number>()(curriedSum(1)(2)(3));
 expectIdentical<number>()(curriedSum(1, 2)(3));
@@ -114,12 +117,12 @@ curriedSum(1)(2)(3)(4);
 curriedSum(1)('s')(3);
 
 // -- 泛型函数 --
-const identity = <T>(val: T, _unused: number) => val;
+declare const identity: <T>(val: T, _unused: number) => T;
 const curriedId = curry(identity<string>, 2);
 expectIdentical<string>()(curriedId('meow')(1));
 
 // -- 混合类型参数 --
-const mixedFunc = (a: string, b: number, c: boolean) => `${a}-${b}-${c}`;
+declare const mixedFunc: (a: string, b: number, c: boolean) => string;
 const curriedMixed = curry(mixedFunc, 3);
 expectIdentical<string>()(curriedMixed('hello')(42)(true));
 // @ts-expect-error: 类型不匹配喵！
@@ -128,9 +131,9 @@ curriedMixed('hello')('world')(true);
 curriedMixed(42)('hello')(true);
 
 // -- 函数作为参数 --
-const applyFunc = (fn: (x: number) => number, x: number) => fn(x);
+declare const applyFunc: (fn: (x: number) => number, x: number) => number;
 const curriedApply = curry(applyFunc, 2);
-const double = (x: number) => x * 2;
+declare const double: (x: number) => number;
 expectIdentical<number>()(curriedApply(double)(10));
 // @ts-expect-error: 函数签名不匹配喵！
 curriedApply((x: string) => x.length)(10);
@@ -140,25 +143,44 @@ curriedApply((x: string) => x.length)(10);
 // ===================================================================
 
 // -- 零参数函数 --
-const noArgs = () => 42;
-const curriedNoArgs = curry(noArgs, 0);
-expectIdentical<{
-  readonly __error: '0 parameters do not need currying, which is meaningless';
-}>()(curriedNoArgs);
+declare const noArgs: () => number;
+// @ts-expect-error: 0参数函数无意义
+curry(noArgs, 1);
 
 // -- 单参数函数 --
-const singleArg = (x: number) => x * 2;
-const curriedSingle = curry(singleArg, 1);
-expectIdentical<number>()(curriedSingle(5));
-// @ts-expect-error: 结果是 number，不能继续调用喵！
-curriedSingle(5)(10);
+
+declare const singleArg: (x: number) => number;
+// @ts-expect-error: 单参数函数无意义
+curry(singleArg, 1);
+
+declare const doubleArg: (x: number, y: number) => number;
+// @ts-expect-error: 0长度毫无意义
+curry(doubleArg, 0);
+
+// @ts-expect-error: 1长度毫无意义
+curry(doubleArg, 1);
+
+// @ts-expect-error: 3长度超了
+curry(doubleArg, 3);
+// 报错：类型“3”的参数不能赋给类型“"The length parameter must be <= 2."”的参数
+
+// @ts-expect-error: 类型系统要求正整数
+curry(doubleArg, -1);
+
+// @ts-expect-error: 类型系统要求正整数
+curry(doubleArg, 1.1);
+
+// @ts-expect-error: 非字面量
+curry(doubleArg, NaN);
+// @ts-expect-error: 非字面量
+curry(doubleArg, Infinity);
+// @ts-expect-error: 非字面量
+curry(doubleArg, -Infinity);
 
 // -- This 绑定 --
-const contextObj = {
-  base: 10,
-  add(a: number, b: number) {
-    return this.base + a + b;
-  },
+declare const contextObj: {
+  base: number;
+  add(a: number, b: number): number;
 };
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const curriedMethod = curry(contextObj.add, 2);
@@ -166,25 +188,23 @@ const curriedMethod = curry(contextObj.add, 2);
 expectIdentical<number>()(curriedMethod.call({base: 20}, 1, 2));
 
 // -- 链式柯里化 --
-const pipeline = (a: number) => (b: number) => (c: number) => a + b + c;
+declare const pipeline: (a: number, b: number, c: number) => number;
 const curriedPipeline = curry(pipeline, 3);
 expectIdentical<number>()(curriedPipeline(1)(2)(3));
+
 // @ts-expect-error: 类型错误喵！
 curriedPipeline('1')(2)(3);
 
 // -- 柯里化柯里化函数 --
-const doubleCurried = curry(curriedAdd, 3);
-const result = doubleCurried(1)(2)(3);
-expectIdentical<{
-  readonly __error: '0 parameters do not need currying, which is meaningless';
-}>()(result);
+// @ts-expect-error: 不能双重柯里化
+curry(curriedAdd, 3);
 
 // ===================================================================
 // 🎨 复杂类型推导测试
 // ===================================================================
 
 // -- 元组类型参数 --
-const tupleFunc = (a: [number, string], b: boolean) => `${a[0]}-${a[1]}-${b}`;
+declare const tupleFunc: (a: [number, string], b: boolean) => string;
 const curriedTuple = curry(tupleFunc, 2);
 const args: [number, string] = [1, 'meow'];
 expectIdentical<string>()(curriedTuple(args)(true));
@@ -192,8 +212,7 @@ expectIdentical<string>()(curriedTuple(args)(true));
 curriedTuple([1, 2])(true);
 
 // -- 联合类型参数 --
-const unionFunc = (a: string | number, _b: boolean) =>
-  typeof a === 'string' ? a.length : a;
+declare const unionFunc: (a: string | number, _b: boolean) => number;
 const curriedUnion = curry(unionFunc, 2);
 expectIdentical<number>()(curriedUnion('hello')(true));
 expectIdentical<number>()(curriedUnion(42)(true));
@@ -201,30 +220,26 @@ expectIdentical<number>()(curriedUnion(42)(true));
 curriedUnion(true)(true);
 
 // -- 可选参数 --
-const optionalFunc = (a: number, b?: string) =>
-  b ? `${a}-${b}` : a.toString();
+declare const optionalFunc: (a?: number, b?: string) => string;
 const curriedOptional = curry(optionalFunc, 2);
-
-// length=1 时只需填一个参数就返回结果
-const curriedOptional1 = curry(optionalFunc, 1);
-expectIdentical<string>()(curriedOptional1(42));
-// @ts-expect-error: 填完 1 个参数后已经是 string，不能继续调用喵！
-curriedOptional1(42)('extra');
 
 // length=2 时需要填两个参数
 expectIdentical<string>()(curriedOptional(42, 'hello'));
 expectIdentical<string>()(curriedOptional(42)('hello'));
+expectIdentical<string>()(curriedOptional(undefined, undefined));
+expectIdentical<string>()(curriedOptional(undefined)(undefined));
+expectIdentical<string>()(curriedOptional(__)(undefined)(undefined));
+
+// @ts-expect-error: 缺少参数喵！
+curriedOptional();
+
+const singleOptional = curriedOptional(1);
+expectIdentical<(b?: string) => string>()(singleOptional);
 
 // -- 默认参数函数的 length 截取 --
 const withDefaults = (a: number, b: number = 10, c: number = 20) => a + b + c;
-const curriedDefaults1 = curry(withDefaults, 1);
 const curriedDefaults2 = curry(withDefaults, 2);
 const curriedDefaults3 = curry(withDefaults, 3);
-
-// length=1: 填 1 个参数就返回
-expectIdentical<number>()(curriedDefaults1(1));
-// @ts-expect-error: 已返回 number，不能继续调用喵！
-curriedDefaults1(1)(2);
 
 // length=2: 填 2 个参数就返回
 expectIdentical<number>()(curriedDefaults2(1, 2));
@@ -238,19 +253,18 @@ expectIdentical<number>()(curriedDefaults3(1)(2)(3));
 expectIdentical<number>()(curriedDefaults3(1, __, 3)(2));
 
 // -- 非字面量 length 参数 --
-const n = 1 - 0;
+const n = 2 - 0;
 expectIdentical<number>()(n);
 // @ts-expect-error 不是字面量喵！
-expectIdentical<1>()(n);
-// 非字面量时返回错误类型
-expectIdentical<{
-  readonly __error: 'The length parameter must be a literal number (e.g., 2), not a variable of type number.';
-}>()(curry(withDefaults, n));
+expectIdentical<2>()(n);
+// 非字面量时报错
+// @ts-expect-error: 非字面量 length 参数喵！
+curry(withDefaults, n);
 
 // -- 交叉类型参数 --
 type Point = {x: number; y: number};
 type Color = {r: number; g: number; b: number};
-const crossFunc = (point: Point & Color, z: number) => point.x + point.r + z;
+declare const crossFunc: (point: Point & Color, z: number) => number;
 const curriedCross = curry(crossFunc, 2);
 expectIdentical<number>()(curriedCross({x: 1, y: 2, r: 3, g: 4, b: 5})(10));
 // @ts-expect-error: 缺少属性喵！
@@ -266,7 +280,7 @@ type BuildTuple<N extends number, T extends any[] = []> = T['length'] extends N
 
 type Args100 = BuildTuple<100>;
 
-const sum100 = (...args: Args100): number => args.reduce((a, b) => a + b, 0);
+declare const sum100: (...args: Args100) => number;
 const curriedSum100 = curry(sum100, 100);
 
 // -- 完整参数校验 (链式调用) --

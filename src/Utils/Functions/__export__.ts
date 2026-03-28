@@ -5,5 +5,7 @@ export {run, runAsync, pipe, pipeAsync} from './pipe';
 export {curry, __} from './curry';
 export * from './debounce';
 export * from './base';
-export * from './defer';
 export * from './pace';
+export * from './ary';
+export * from './flip';
+export * from './partial';

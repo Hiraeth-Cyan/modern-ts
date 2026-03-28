@@ -1,6 +1,6 @@
 # curry
 
-`curry(fn, length)` 创建柯里化函数，支持分步传参和占位符（`__`）功能，实现灵活的偏函数应用
+`curry(fn, length)` 创建柯里化函数，支持分步传参和占位符（`__`）功能，实现灵活的偏函数应用。
 
 ## 使用场景
 
@@ -17,6 +17,7 @@
 ### 精确的类型控制
 - **类型安全**：TypeScript 会在编译期验证参数类型
 - **智能提示**：每一步调用都能获得准确的类型提示和自动补全
+- **早期错误检测**：类型错误在调用时就会报错，而不是在使用返回值时才报错
 
 ### 显式控制元数
 - **自定义参数数量**：通过 `length` 参数显式指定需要收集多少个参数才执行原函数
@@ -26,27 +27,39 @@
 
 ```typescript
 // 创建柯里化函数
-function curry<F extends (...args: any[]) => any>(fn: F, length: number): Curry<F>;
+function curry<F extends AnyFunction, N extends number>(
+  fn: ValidCurryFn<F>,
+  length: ValidLengthForFn<F, N>
+): Curry<F, N> & CurryBrand;
 
 // 占位符符号
 const __: unique symbol;
+type __ = typeof __;
 ```
 
 ### 参数
 
 | 参数     | 类型     | 说明                                                 |
 | -------- | -------- | ---------------------------------------------------- |
-| `fn`     | `F`      | 要柯里化的原函数                                     |
-| `length` | `number` | 需要收集的参数数量（正整数），达到此数量后执行原函数 |
+| `fn`     | `F`      | 要柯里化的原函数。必须至少有 2 个参数。不能是已柯里化的函数。不能包含剩余参数。 |
+| `length` | `N`      | 需要收集的参数数量（正整数字面量），达到此数量后执行原函数。必须小于等于函数参数数量。 |
 
 ### 返回值
 
 - 如果提供的参数数量（不含占位符）达到 `length`，返回原函数的执行结果
 - 否则返回一个新的柯里化函数，等待更多参数
 
-### 异常
+### 类型约束
 
-- 当 `length` 不是正整数时，抛出 `ParameterError`
+以下情况会被类型系统禁止，在调用时就会报错：
+
+- **单参数函数**：对只有 1 个参数的函数进行柯里化没有意义
+- **零参数函数**：不能对无参数函数进行柯里化
+- **Length = 1**：指定长度为 1 是不允许的
+- **已柯里化的函数**：不能对已经柯里化的函数再次柯里化
+- **Length > 参数数量**：指定的长度不能超过函数的参数数量
+- **非字面量 length**：length 必须是正整数字面量，不能是 `number` 类型的变量
+- **剩余参数**：带有剩余参数（`...args`）的函数不能被柯里化
 
 ## 使用示例
 
@@ -162,15 +175,20 @@ console.log(curried1(5));  // 35 (5 + 10 + 20)
 const curried3 = curry(withDefaults, 3);
 console.log(curried3(5)(6)(7));  // 18 (5 + 6 + 7)
 console.log(curried3(5, 6, 7));  // 18
+
+// 可选参数可以传 undefined 来使用默认值
+const curried2 = curry(withDefaults, 2);
+console.log(curried2(5, undefined));  // 35 (5 + 10 + 20)，b 使用默认值
 ```
 
 ## 注意事项
 
 1. **length 参数必填**：必须显式指定需要收集的参数数量
    ```typescript
-   // 错误：length 必须是正整数
-   curry(add, 0);  // 抛出 ParameterError
-   curry(add, -1); // 抛出 ParameterError
+   // 错误：length 必须是正整数字面量
+   curry(add, 0);  // 类型错误
+   curry(add, -1); // 类型错误
+   curry(add, 1);  // 类型错误：length 必须 >= 2
    ```
 
 2. **占位符替换规则**：
@@ -181,6 +199,7 @@ console.log(curried3(5, 6, 7));  // 18
 3. **类型安全**：
    - 空参数调用会被类型系统阻止
    - 类型不匹配的参数会在编译期报错
+   - 错误在调用位置就会报告（逆变位检测）
 
 4. **执行时机**：
    - 当 `实参数量 - 占位符数量 >= length` 时执行原函数
@@ -206,7 +225,12 @@ console.log(curried3(5, 6, 7));  // 18
      const noArgs = () => 42;
      // curry(noArgs, 0) 会产生类型错误
      ```
+   
+   - **重复柯里化**：不能对已经柯里化的函数再次柯里化
+     ```typescript
+     const curried = curry(add, 3);
+     // curry(curried, 2) 会产生类型错误
+     ```
 
 6. **this 上下文**：
-   - 柯里化通常会丢失 `this` 上下文绑定
-   - 如需保留上下文，请在使用前手动 `bind`
+   - 柯里化会保留 `this` 上下文绑定

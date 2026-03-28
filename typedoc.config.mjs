@@ -7,7 +7,7 @@ const config = {
     '**/__benchmark__/**',
     '**/__examples__/**',
     '**/*.test.ts',
-    
+
     '**/*.test-d.ts',
   ],
   out: './docs/api/',
@@ -20,6 +20,8 @@ const config = {
         'https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal',
       Disposable:
         'https://github.com/microsoft/TypeScript/blob/main/src/lib/esnext.disposable.d.ts',
+      AsyncDisposable:
+        'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/asyncDispose',
     },
   },
   excludeExternals: true,

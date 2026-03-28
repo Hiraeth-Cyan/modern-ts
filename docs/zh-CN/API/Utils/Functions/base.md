@@ -1,15 +1,15 @@
 # Functions Base
 
-函数操作的基础工具函数，提供恒等函数、空函数、参数控制、偏函数应用、记忆化等功能
+函数操作的基础工具函数，提供恒等函数、空函数、执行控制、记忆化等功能。
 
 ---
 
 ## 使用场景
 
-- **函数参数控制**：限制参数数量、转换参数形式
-- **偏函数应用**：预先填充部分参数，创建专用函数
 - **执行控制**：限制函数执行次数、延迟执行
 - **错误处理**：安全执行函数，避免 try-catch
+- **资源管理**：使用 defer 模式管理异步资源清理
+- **函数转换**：参数形式转换、结果取反等
 
 ---
 
@@ -79,34 +79,6 @@ await cleanup();
 
 ---
 
-### unary
-
-创建一个只接受第一个参数的函数，忽略额外参数
-
-```typescript
-function unary<F extends AnyFunction>(
-  fn: F
-): (this: ThisParameterType<F>, arg: Parameters<F>[0]) => ReturnType<F>;
-```
-
-| 参数  | 类型                               | 描述           |
-| ----- | ---------------------------------- | -------------- |
-| `fn`  | `F extends AnyFunction` | 原函数 |
-
-**返回值：** 只接受一个参数的新函数
-
-**示例：**
-
-```typescript
-// parseInt 会接收第二个参数作为进制，导致意外行为
-['1', '2', '3'].map(parseInt);  // [1, NaN, NaN]
-
-// 使用 unary 限制只接收一个参数
-['1', '2', '3'].map(unary(parseInt));  // [1, 2, 3]
-```
-
----
-
 ### negate
 
 创建一个返回原谓词函数结果取反的新函数
@@ -117,9 +89,9 @@ function negate<Args extends unknown[]>(
 ): (this: ThisParameterType<typeof predicate>, ...args: Args) => boolean;
 ```
 
-| 参数         | 类型                           | 描述         |
-| ------------ | ------------------------------ | ------------ |
-| `predicate`  | `(...args: Args) => boolean`   | 谓词函数 |
+| 参数        | 类型                         | 描述     |
+| ----------- | ---------------------------- | -------- |
+| `predicate` | `(...args: Args) => boolean` | 谓词函数 |
 
 **返回值：** 结果取反的新函数
 
@@ -150,8 +122,8 @@ function once<Args extends unknown[], Ret>(
 ): (this: ThisParameterType<typeof fn>, ...args: Args) => Ret;
 ```
 
-| 参数 | 类型                    | 描述       |
-| ---- | ----------------------- | ---------- |
+| 参数 | 类型                     | 描述   |
+| ---- | ------------------------ | ------ |
 | `fn` | `(...args: Args) => Ret` | 原函数 |
 
 **返回值：** 只执行一次的新函数
@@ -172,46 +144,6 @@ init();  // 'initialized', count = 1
 
 ---
 
-### ary
-
-创建一个只接受前 n 个参数的函数
-
-```typescript
-function ary<F extends AnyFunction, N extends number>(
-  fn: F,
-  n: N
-): Ary<F, N>;
-```
-
-| 参数 | 类型                    | 描述           |
-| ---- | ----------------------- | -------------- |
-| `fn` | `F` | 原函数         |
-| `n`  | `N extends number`      | 接受的参数数量（必须为字面量数字） |
-
-**返回值：** 参数受限的新函数
-
-**注意：** `n` 参数必须使用字面量数字（如 `2`），不能使用 `number` 类型的变量，否则会产生类型错误
-
-**示例：**
-
-```typescript
-const fn = (a: string, b: string, c: string, d: string) => [a, b, c, d];
-const ary2 = ary(fn, 2);
-
-ary2('a', 'b');  // ['a', 'b', undefined, undefined]
-
-// n = 0 时不传递任何参数
-const ary0 = ary(fn, 0);
-ary0();  // [undefined, undefined, undefined, undefined]
-
-// 常见用法：修复 parseInt 在 map 中的问题
-['1', '2', '3'].map(unary(parseInt));  // [1, 2, 3]
-// 等价于
-['1', '2', '3'].map(ary(parseInt, 1));  // [1, 2, 3]
-```
-
----
-
 ### rest
 
 将函数参数分割为固定参数和剩余参数两部分
@@ -226,8 +158,8 @@ function rest<
 ): (this: ThisParameterType<typeof fn>, ...args: [...FixedArgs, ...RestArgs]) => Ret;
 ```
 
-| 参数 | 类型                                      | 描述                     |
-| ---- | ----------------------------------------- | ------------------------ |
+| 参数 | 类型                                        | 描述               |
+| ---- | ------------------------------------------- | ------------------ |
 | `fn` | `(fixed: FixedArgs, rest: RestArgs) => Ret` | 接收分割参数的函数 |
 
 **返回值：** 接收展开参数的新函数
@@ -256,8 +188,8 @@ function spread<Args extends unknown[], Ret>(
 ): (this: ThisParameterType<typeof fn>, args: Args) => Ret;
 ```
 
-| 参数 | 类型                    | 描述       |
-| ---- | ----------------------- | ---------- |
+| 参数 | 类型                     | 描述   |
+| ---- | ------------------------ | ------ |
 | `fn` | `(...args: Args) => Ret` | 原函数 |
 
 **返回值：** 接收数组参数的新函数
@@ -277,76 +209,6 @@ pairs.map(spread((a, b) => a + b));  // [3, 7, 11]
 
 ---
 
-### partial
-
-创建一个预设部分参数的函数（参数前置）
-
-```typescript
-function partial<Fixed extends unknown[], Rest extends unknown[], Ret>(
-  fn: (...args: [...Fixed, ...Rest]) => Ret,
-  ...fixedArgs: Fixed
-): (this: ThisParameterType<typeof fn>, ...rest: Rest) => Ret;
-```
-
-| 参数          | 类型                                      | 描述           |
-| ------------- | ----------------------------------------- | -------------- |
-| `fn`          | `(...args: [...Fixed, ...Rest]) => Ret`   | 原函数         |
-| `...fixedArgs` | `Fixed`                                   | 预设的前置参数 |
-
-**返回值：** 预设参数的新函数
-
-**示例：**
-
-```typescript
-const greet = (greeting: string, name: string, punctuation: string) =>
-  `${greeting}, ${name}${punctuation}`;
-
-const sayHello = partial(greet, 'Hello');
-sayHello('World', '!');  // 'Hello, World!'
-
-const sayHelloToAlice = partial(greet, 'Hello', 'Alice');
-sayHelloToAlice('!');  // 'Hello, Alice!'
-```
-
----
-
-### partialRight
-
-创建一个预设部分参数的函数（参数后置）
-
-```typescript
-function partialRight<T extends (...args: any[]) => any, Fixed extends any[]>(
-  fn: T,
-  ...fixedArgs: Fixed
-): (
-  this: ThisParameterType<T>,
-  ...rest: T extends (...args: [...infer Rest, ...Fixed]) => any ? Rest : never
-) => ReturnType<T>;
-```
-
-| 参数          | 类型     | 描述           |
-| ------------- | -------- | -------------- |
-| `fn`          | `T`      | 原函数         |
-| `...fixedArgs` | `Fixed`  | 预设的后置参数 |
-
-**返回值：** 预设参数的新函数
-
-**示例：**
-
-```typescript
-const format = (name: string, action: string, target: string) =>
-  `${name} ${action} ${target}`;
-
-const ranToStore = partialRight(format, 'ran to', 'the store');
-ranToStore('Alice');  // 'Alice ran to the store'
-
-const calculate = (a: number, b: number, c: number, d: number) => a + b + c + d;
-const addSeven = partialRight(calculate, 3, 4);
-addSeven(1, 2);  // 10 (1 + 2 + 3 + 4)
-```
-
----
-
 ### after
 
 创建一个在调用 n 次后才执行的函数
@@ -361,10 +223,10 @@ function after<Args extends unknown[], Ret>(
 ): (this: ThisParameterType<typeof fn>, ...args: Args) => Ret | NotInvoked;
 ```
 
-| 参数 | 类型                    | 描述             |
-| ---- | ----------------------- | ---------------- |
-| `n`  | `number`                | 开始执行的调用次数 |
-| `fn` | `(...args: Args) => Ret` | 原函数           |
+| 参数 | 类型                     | 描述               |
+| ---- | ------------------------ | ------------------ |
+| `n`  | `number`                 | 开始执行的调用次数 |
+| `fn` | `(...args: Args) => Ret` | 原函数             |
 
 **返回值：** 延迟执行的新函数，未达到次数时返回 `NOT_INVOKED`
 
@@ -404,10 +266,10 @@ function before<Args extends unknown[], Ret>(
 ): (this: ThisParameterType<typeof fn>, ...args: Args) => Ret | NotInvoked;
 ```
 
-| 参数 | 类型                    | 描述             |
-| ---- | ----------------------- | ---------------- |
-| `n`  | `number`                | 停止执行的调用次数 |
-| `fn` | `(...args: Args) => Ret` | 原函数           |
+| 参数 | 类型                     | 描述               |
+| ---- | ------------------------ | ------------------ |
+| `n`  | `number`                 | 停止执行的调用次数 |
+| `fn` | `(...args: Args) => Ret` | 原函数             |
 
 **返回值：** 限制执行次数的新函数，首次调用前返回 `NOT_INVOKED`
 
@@ -436,18 +298,32 @@ neverRuns();  // NOT_INVOKED
 创建一个记忆化函数，缓存计算结果
 
 ```typescript
-function memoize<Args extends unknown[], Ret>(
-  fn: (...args: Args) => Ret,
-  resolver?: (this: ThisParameterType<typeof fn>, ...args: Args) => unknown
-): (this: ThisParameterType<typeof fn>, ...args: Args) => Ret;
+interface MemoizeCache<K, V> {
+  set(key: K, value: V): void;
+  get(key: K): V | undefined;
+  has(key: K): boolean;
+  delete(key: K): boolean | void;
+  clear(): void;
+  readonly size: number;
+}
+
+interface MemoizeOptions<K, V, Args extends unknown[] = unknown[]> {
+  cache?: MemoizeCache<K, V>;
+  getCacheKey?: (...args: Args) => K;
+}
+
+function memoize<F extends AnyFunction>(
+  fn: F,
+  options?: MemoizeOptions<unknown, ReturnType<F>, Parameters<F>>
+): F & {cache: MemoizeCache<unknown, ReturnType<F>>};
 ```
 
-| 参数        | 类型                              | 描述                         |
-| ----------- | --------------------------------- | ---------------------------- |
-| `fn`        | `(...args: Args) => Ret`          | 要记忆化的函数               |
-| `resolver`  | `(...args: Args) => unknown`      | 可选，自定义缓存键生成函数 |
+| 参数      | 类型                                                    | 描述                             |
+| --------- | ------------------------------------------------------- | -------------------------------- |
+| `fn`      | `F`                                                     | 要记忆化的函数                   |
+| `options` | `MemoizeOptions<unknown, ReturnType<F>, Parameters<F>>` | 可选，记忆化选项（缓存和键生成） |
 
-**返回值：** 带缓存的新函数
+**返回值：** 带 `cache` 属性的新函数
 
 **示例：**
 
@@ -463,18 +339,24 @@ square(5);  // 25, computeCount = 1
 square(5);  // 25, computeCount = 1 (使用缓存)
 square(10); // 100, computeCount = 2
 
-// 使用自定义 resolver
+// 使用自定义 getCacheKey
 const getUser = memoize(
   (user: { id: number; name: string }) => expensiveLookup(user.id),
-  (user) => user.id  // 只根据 id 缓存
+  {
+    getCacheKey: (user) => user.id  // 只根据 id 缓存
+  }
 );
+
+// 使用自定义 cache
+const customCache = new Map();
+const cachedFn = memoize(expensiveFn, { cache: customCache });
 ```
 
 ---
 
 ### attempt
 
-安全执行函数，返回 `[error, result]` 元组，无需 try-catch
+安全执行函数，返回 `[error, result]` 元组，无需 try-catch。支持同步和异步函数。
 
 ```typescript
 type AttemptResult<T> = [T] extends [never]
@@ -493,9 +375,9 @@ function attempt<Args extends unknown[], R>(
 ) => AttemptResult<R>;
 ```
 
-| 参数  | 类型                    | 描述         |
-| ----- | ----------------------- | ------------ |
-| `fn`  | `(...args: Args) => R`  | 要包装的函数 |
+| 参数 | 类型                   | 描述         |
+| ---- | ---------------------- | ------------ |
+| `fn` | `(...args: Args) => R` | 要包装的函数 |
 
 **返回值：** 返回一个函数，该函数返回 `[error, result]` 元组
 
@@ -530,6 +412,57 @@ const [err4, data] = await safeFetchData('https://api.example.com');
 
 ---
 
+### defer
+
+执行带有延迟清理/错误处理回调的任务。提供类似 try-finally 的资源管理模式，但支持异步清理和多个回调。
+
+```typescript
+export const DEFER_NO_ERROR = Symbol('No Error');
+
+type DeferErrorCallback = (error: unknown) => unknown;
+type DeferRegisterFn = (fn: DeferErrorCallback) => void;
+
+function defer<R>(
+  task: (register: DeferRegisterFn) => MaybePromise<R>
+): Promise<R>;
+```
+
+| 参数   | 类型                                             | 描述                             |
+| ------ | ------------------------------------------------ | -------------------------------- |
+| `task` | `(register: DeferRegisterFn) => MaybePromise<R>` | 接收注册函数并返回结果的任务函数 |
+
+**返回值：** 解析为任务结果的 Promise
+
+**异常：**
+- 如果任务和回调都失败，抛出包含所有错误的 `AggregateError`
+- 如果只有任务失败且回调成功，抛出原始错误
+- 如果只有回调失败，抛出 `AggregateError`
+
+**示例：**
+
+```typescript
+const result = await defer(async (register) => {
+  const resource = acquireResource();
+  register(async (error) => {
+    await resource.release();
+  });
+  return resource.use();
+});
+
+// 多个清理回调按 LIFO 顺序执行
+const result2 = await defer(async (register) => {
+  const db = await connectDB();
+  register(async () => { await db.close(); });
+  
+  const file = await openFile('data.txt');
+  register(async () => { await file.close(); });
+  
+  return await processData(db, file);
+});
+```
+
+---
+
 ## 注意事项
 
 1. **once 的参数**：只有第一次调用的参数会被使用，后续调用的参数被忽略
@@ -540,3 +473,4 @@ const [err4, data] = await safeFetchData('https://api.example.com');
    - `before(n, fn)` 在第 n 次调用时停止执行并返回最后一次结果
    - 未执行时返回 `NOT_INVOKED` Symbol，而非 `undefined`
 5. **NOT_INVOKED Symbol**：用于标识 `after`/`before` 函数尚未执行，可通过 `result === NOT_INVOKED` 检查
+6. **defer 回调执行顺序**：注册的回调按 LIFO（后进先出）顺序执行，与资源获取顺序相反

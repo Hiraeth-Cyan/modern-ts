@@ -9,9 +9,9 @@ import {run, runAsync, pipe, pipeAsync} from './pipe';
 // 1. 基础功能类型测试
 // ===================================================================
 
-const add1 = (x: number) => x + 1;
-const mul2 = (x: number) => x * 2;
-const toString = (x: number) => x.toString();
+declare const add1: (x: number) => number;
+declare const mul2: (x: number) => number;
+declare const toString: (x: number) => string;
 
 // 1.1 同步 pipe 基础
 const syncPipe = pipe(add1, mul2, toString);
@@ -20,22 +20,22 @@ expectIdentical<string>()(syncPipe(5));
 expectIdentical<number>()(syncPipe(5));
 
 // 1.2 异步 pipe 基础
-const asyncAdd1 = async (x: number) => Promise.resolve(x + 1);
+declare const asyncAdd1: (x: number) => Promise<number>;
 const asyncPipe = pipeAsync(asyncAdd1, mul2, toString);
 expectIdentical<Promise<string>>()(asyncPipe(5));
 // @ts-expect-error: 结果是 Promise<string>，不能赋值给 string
 expectIdentical<string>()(asyncPipe(5));
 
 // 1.3 空 pipe (Identity)
-const emptyPipe = pipe();
-expectIdentical<42>()(emptyPipe(42));
+const emptyPipe_value = pipe()(42);
+expectIdentical<42>()(emptyPipe_value);
 
 // ===================================================================
 // 2. 参数兼容性测试
 // ===================================================================
 
 // 2.1 第一个函数多参数
-const multiParam = (a: number, b: number) => a + b;
+declare const multiParam: (a: number, b: number) => number;
 const pipeWithMulti = pipe(multiParam, toString);
 expectIdentical<string>()(pipeWithMulti(2, 42));
 
@@ -47,6 +47,12 @@ pipeWithMulti(42, 'world');
 // 2.2 中间函数类型错位
 // @ts-expect-error: number 不能赋值给 string
 pipe(add1, (x: string) => x.length);
+
+// 2.3 可选参数
+declare const optionalParam: (x?: number) => number;
+const pipeWithOptional = pipe(optionalParam, toString);
+expectIdentical<string>()(pipeWithOptional(5));
+expectIdentical<string>()(pipeWithOptional());
 
 // ===================================================================
 // 3. run / runAsync 输入校验
@@ -71,7 +77,7 @@ void runAsync('10', asyncAdd1, mul2);
 // ===================================================================
 
 // 4.1 允许同步 pipe 中混入 async 函数
-const _await = async (v: Promise<unknown>) => await v;
+declare const _await: (v: Promise<unknown>) => Promise<unknown>;
 void pipe(add1, asyncAdd1, _await);
 
 // 4.2 异步 pipe 中使用同步函数
@@ -87,15 +93,15 @@ expectIdentical<Promise<number>>()(syncFirstAsyncPipe(5));
 // ===================================================================
 
 // 5.1 泛型函数保持类型
-const id = <T>(x: T) => x;
+declare const id: <T>(x: T) => T;
 const genericPipe = pipe(id<number>, add1);
 expectIdentical<number>()(genericPipe(100));
 // @ts-expect-error: 结果是 number
 expectIdentical<string>()(genericPipe(100));
 
 // 5.2 复杂泛型
-const wrap = <T>(x: T) => ({value: x});
-const unwrap = <T>(obj: {value: T}) => obj.value;
+declare const wrap: <T>(x: T) => {value: T};
+declare const unwrap: <T>(obj: {value: T}) => T;
 const complexPipe = pipe(wrap<string>, unwrap<string>);
 expectIdentical<string>()(complexPipe('meow'));
 // @ts-expect-error: 结果是 string
@@ -113,7 +119,7 @@ expectIdentical<number>()(singlePipe(1));
 expectIdentical<number>()(run(1, add1));
 
 // 6.3 错误：后续函数多参数
-const badFn = (a: number, b: number) => a + b;
+declare const badFn: (a: number, b: number) => number;
 // @ts-expect-error: 后续函数必须是单参数
 const badPipe2 = pipe(add1, badFn);
 
@@ -133,7 +139,7 @@ expectIdentical<Promise<string>>()(asyncToSync(1));
 expectIdentical<Promise<number>>()(runAsync(1, add1, mul2));
 
 // 7.3 异步函数返回非 Promise
-const fakeAsync = (x: number) => x; // 实际同步
+declare const fakeAsync: (x: number) => number;
 const fakePipe = pipeAsync(fakeAsync, asyncAdd1);
 expectIdentical<Promise<number>>()(fakePipe(1));
 
@@ -142,10 +148,9 @@ expectIdentical<Promise<number>>()(fakePipe(1));
 // ===================================================================
 
 type User = {name: string; age: number};
-const fetchUser = async (id: number): Promise<User> =>
-  Promise.resolve({name: '喵', age: id});
-const getName = (user: User) => user.name;
-const greet = (name: string) => `Hello, ${name}!`;
+declare const fetchUser: (id: number) => Promise<User>;
+declare const getName: (user: User) => User['name'];
+declare const greet: (name: User['name']) => string;
 
 const longAsyncPipe = pipeAsync(fetchUser, getName, greet);
 expectIdentical<Promise<string>>()(longAsyncPipe(5));

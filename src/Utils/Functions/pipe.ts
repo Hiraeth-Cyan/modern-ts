@@ -52,36 +52,12 @@ export type PipeError<Expected, Actual> = {
 };
 
 /**
- * A type that forces a TypeScript error when a pipe function's input type
- * (Actual) does not match the previous function's output type (Expected). (Async version)
- * @template Expected - The expected input type
- * @template Actual - The actual input type received (from the previous function's output)
- */
-export type PipeErrorAsync<Expected, Actual> = (
-  __error: never,
-  expected: Expected,
-  actual: Actual,
-) => Actual;
-
-/**
  * A type that forces a TypeScript error when the initial input of `run`
  * (Actual) does not match the input type of the first function (Expected). (Sync version)
  * @template Expected - The expected input type of the first function
  * @template Actual - The actual input type provided to `run`
  */
 type RunInputError<Expected, Actual> = (
-  __error: never,
-  expected: Expected,
-  actual: Actual,
-) => Actual;
-
-/**
- * A type that forces a TypeScript error when the initial input of `runAsync`
- * (Actual) does not match the input type of the first function (Expected). (Async version)
- * @template Expected - The expected input type of the first function
- * @template Actual - The actual input type provided to `runAsync`
- */
-type RunInputErrorAsync<Expected, Actual> = (
   __error: never,
   expected: Expected,
   actual: Actual,
@@ -101,12 +77,8 @@ type VInput<T, F1, IsAsync extends boolean> =
   F1 extends BaseNextFn<infer ExpectedIn, unknown, IsAsync> // [L1]：约束 第一个函数必须满足 BaseNextFn（单参数）
     ? T extends ExpectedIn // [L2]：类型T必须能够兼容ExpectedIn（run的第一个参数T，能否兼容第一个函数F1）
       ? T
-      : IsAsync extends true // [L2]：不兼容就报错！
-        ? RunInputErrorAsync<ExpectedIn, T>
-        : RunInputError<ExpectedIn, T>
-    : IsAsync extends true // [L1]：如果不满足 BaseNextFn，则会报错
-      ? RunInputErrorAsync<unknown[], T>
-      : RunInputError<unknown[], T>;
+      : RunInputError<ExpectedIn, T>
+    : RunInputError<unknown[], T>;
 
 /**
  * Recursively validates the function chain to ensure the output of the preceding function
@@ -140,9 +112,7 @@ type VFuncsIterative<
           [
             ...Acc,
             F,
-            IsAsync extends true
-              ? PipeErrorAsync<IsAsync extends true ? Awaited<O> : O, S>
-              : PipeError<IsAsync extends true ? Awaited<O> : O, S>,
+            PipeError<IsAsync extends true ? Awaited<O> : O, S>,
             ...(Oth extends readonly unknown[] ? Oth : []),
           ]
       : // [L3]：R 为空元组 []。-> 递归结束（成功）
@@ -150,9 +120,7 @@ type VFuncsIterative<
     : // [L2]：F 不是合法函数。-> 返回错误元组（结束）
       [
         ...Acc,
-        IsAsync extends true
-          ? PipeErrorAsync<unknown[], F>
-          : PipeError<unknown[], F>,
+        PipeError<unknown[], F>,
         ...(R extends readonly unknown[] ? R : []),
       ]
   : Fns extends [] // [L1]：Fns 为空元组 []。-> 递归结束（初始 Fns 为空，或已跑完）
@@ -367,9 +335,7 @@ export function pipe<
 >(...fns: VFuncs<Fns>): PipeR<Fns>;
 
 export function pipe(...fns: unknown[]): unknown {
-  if (fns.length === 0) {
-    return identity; // 如果没有函数，返回恒等函数
-  }
+  if (fns.length === 0) return identity; // 如果没有函数，返回恒等函数
   // 返回柯里化函数
   return (...args: unknown[]) => {
     // 1. 先执行第一个多参数函数
@@ -423,10 +389,7 @@ export function pipeAsync<
   Fns extends readonly [AsyncFn<any, any>, ...AsyncNextFn<any, any>[]],
 >(...fns: AsyncVFuncs<Fns>): AsyncPipeR<Fns>;
 export function pipeAsync(...fns: unknown[]): unknown {
-  if (fns.length === 0) {
-    return identity;
-  }
-
+  if (fns.length === 0) return identity;
   // 返回柯里化函数
   return (...args: unknown[]) => {
     // 1. 执行第一个多参数函数

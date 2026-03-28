@@ -10,7 +10,7 @@ Self-contained · Zero Dependencies · 100% Coverage · Tree-shakeable · High P
 
 > ⚠️ **Beta Notice**: Currently in beta phase, collecting community feedback. API may undergo breaking changes at any time. Use with caution in production environments.
 
-***
+---
 
 ## Features
 
@@ -51,10 +51,12 @@ A mock clock based on `AsyncLocalStorage`, supports concurrent testing with deep
 
 A comprehensive utility function library (similar to `lodash`):
 
-- Type-safe `curry` / `pipe` (supports placeholders and deep inference)
+- Fully type-safe `curry` (supports placeholders and deep inference) / `pipe` / `flip` / `ary` / `partial` / `partialRight`
 - High-performance `debounce` / `throttle` (more robust edge handling than `lodash`)
 - Deep copy `cloneDeep` (supports circular references, stack-based implementation, handles 100k+ nesting levels)
 - Common type utilities, array, object, function, string, Map/Set utility functions
+
+Built with pure TypeScript, fully tree-shakable, and highly robust
 
 ### 🌐 FetchQ — HTTP Client
 
@@ -157,7 +159,7 @@ result.ok === true, result.value is the validated object with type:
 ### Example: MockClock Concurrent Time Simulation
 
 ```typescript
-import { MockClock, runTimelineAsync } from 'modern-ts/VirtualTime';
+import { MockClock, withTimelineAsync } from 'modern-ts/VirtualTime';
 
 // Concurrent testing: two independent timelines, isolated from each other
 const clock1 = MockClock();
@@ -224,13 +226,13 @@ await Promise.all([
 
 ## API Documentation
 
-For detailed API documentation, see the [docs/en-US](./docs/en-US) directory.
-Or run `npm run typedoc` to generate API documentation.
+For detailed API documentation, see the [docs/en-US](./docs/en-US) directory,
+or run `npx typedoc` to generate API documentation.
 
 ## Requirements
 
 - Node.js >= 20
-- TypeScript >= 5.0
+- TypeScript >= 5.2
 
 ## License
 

@@ -433,7 +433,6 @@ export class TaskScope {
 
     return runner;
   }
-  
 
   /**
    * Links external AbortSignals to this scope's lifecycle.

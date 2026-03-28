@@ -2,7 +2,6 @@
 import {defineConfig} from 'vitest/config';
 import path from 'path';
 
-
 export default defineConfig({
   resolve: {
     alias: {
@@ -12,7 +11,8 @@ export default defineConfig({
   test: {
     typecheck: {
       enabled: false,
-      include: ['src/**/*.ts'],
+      only: true,
+      include: ['src/**/*test-d.ts'],
     },
     globals: true,
     environment: 'node',

@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* v8 ignore file -- @preserve */
 
-export type AnyFunction = (...args: any[]) => any;
+/**
+ * Represents any function type that can accept any arguments and return any value.
+ * An alternative to the built-in overly broad `Function` interface.
+ */
+export type AnyFunction = (this: any, ...args: any[]) => any;
 
 /**
  * Represents a value that can be either a plain value or a Promise-like object.
@@ -101,6 +105,17 @@ export type LiteralUnion<Literal, Base extends string | number> =
 export type Prettify<T> = {[K in keyof T]: T[K]} & {};
 
 /**
+ * Recursively expands all properties of an object type.
+ * @template T - The source type
+ * @remarks Functions are left untouched (preserved as-is).
+ */
+export type ExpandDeep<T> = T extends object
+  ? T extends (...args: any[]) => any
+    ? T
+    : {[K in keyof T]: ExpandDeep<T[K]>}
+  : T;
+
+/**
  * Extracts the resolved return type of an async function.
  * @template T - The async function type
  * @remarks Unwraps Promise to get the actual return type.
@@ -108,6 +123,14 @@ export type Prettify<T> = {[K in keyof T]: T[K]} & {};
 export type AsyncReturnType<T extends (...args: any) => any> = Awaited<
   ReturnType<T>
 >;
+
+/**
+ * Checks if a tuple type is a rest tuple.
+ * @template A - The tuple type to check
+ * @returns `true` if A is a rest tuple, otherwise `false`
+ */
+export type IsRestTuple<A extends readonly unknown[]> =
+  number extends A['length'] ? true : false;
 
 /**
  * Checks if a type is the `any` type.
@@ -130,6 +153,79 @@ export type IsUndefined<T> = [T] extends [undefined] ? true : false;
  * @returns `true` if T is `never`, otherwise `false`
  */
 export type IsNever<T> = [T] extends [never] ? true : false;
+
+/**
+ * Checks if a type is a literal number type.
+ * @template T - The type to check
+ * @returns `true` if T is a literal number (e.g., 5, 3.14, -7), otherwise `false`
+ * @remarks Returns `false` for the broad `number` type.
+ */
+export type IsLiteralNumber<T> = number extends T
+  ? false
+  : T extends number
+    ? true
+    : false;
+
+/**
+ * Checks if a type is an integer literal.
+ * @template T - The type to check
+ * @returns `true` if T is an integer literal (e.g., 5, -7, 0), otherwise `false`
+ * @remarks Returns `false` for floating-point literals (e.g., 3.14) and the broad `number` type.
+ */
+export type IsIntegerLiteral<T> =
+  IsLiteralNumber<T> extends true
+    ? `${Extract<T, number>}` extends `${infer _}.${infer _}`
+      ? false
+      : true
+    : false;
+
+/**
+ * Checks if a type is a non-negative integer literal.
+ * @template T - The type to check
+ * @returns `true` if T is a non-negative integer literal (e.g., 0, 1, 5, 100), otherwise `false`
+ * @remarks Returns `false` for negative integers (e.g., -7), floating-point literals, and the broad `number` type.
+ */
+export type IsNonNegativeIntegerLiteral<T> =
+  IsIntegerLiteral<T> extends true
+    ? `${Extract<T, number>}` extends `-${infer _}`
+      ? false
+      : true
+    : false;
+
+/**
+ * Constructs a tuple of a given length.
+ * @template L - The target length (must be a non-negative integer literal)
+ * @template Acc - Accumulator for recursion (internal use)
+ * @returns A tuple type with exactly `L` elements
+ */
+export type BuildTuple<
+  L extends number,
+  Acc extends unknown[] = [],
+> = Acc['length'] extends L ? Acc : BuildTuple<L, [...Acc, unknown]>;
+
+/**
+ * Subtracts two non-negative integer literals at the type level.
+ * @template A - The minuend (must be a non-negative integer literal)
+ * @template B - The subtrahend (must be a non-negative integer literal)
+ * @returns `A - B` as a literal number, or `never` if `B > A`
+ */
+export type Subtract<A extends number, B extends number> =
+  BuildTuple<A> extends [...BuildTuple<B>, ...infer Rest]
+    ? Rest['length']
+    : never;
+
+/**
+ * Checks if a type is a positive integer literal.
+ * @template T - The type to check
+ * @returns `true` if T is a positive integer literal (e.g., 1, 5, 100), otherwise `false`
+ * @remarks Returns `false` for zero, negative integers (e.g., -7), floating-point literals, and the broad `number` type.
+ */
+export type IsPositiveIntegerLiteral<T> =
+  IsNonNegativeIntegerLiteral<T> extends true
+    ? T extends 0
+      ? false
+      : true
+    : false;
 
 /**
  * Checks if a type is the `unknown` type.
@@ -167,13 +263,6 @@ export type JSONValue =
   | JSONValue[];
 
 /**
- * Casts an unknown value to Error type.
- * @param e - The value to cast
- * @returns The casted Error value
- */
-export const castErr = (e: unknown) => e as Error;
-
-/**
  * Asserts that one type is assignable to another.
  * @template T - The source type
  * @template U - The target type
@@ -181,6 +270,44 @@ export const castErr = (e: unknown) => e as Error;
  * @returns A function that expects a value assignable to T
  */
 export const expectAssignable = <T>(_: T): void => {};
+
+/**
+ * Asserts that one type is strictly assignable to another (excludes `any`).
+ *
+ * @template T - The target type to check assignability against
+ * @returns A curried function that expects a value of type U
+ *
+ * @remarks
+ * This function uses currying to separate type parameter specification from value inference:
+ * - First call: Specify the target type `T` explicitly
+ * - Second call: Pass the actual value, from which `U` is inferred
+ *
+ * The curried form is necessary because:
+ * 1. It ensures `T` is explicitly provided rather than inferred from the value
+ * 2. It allows `U` to be inferred independently from the passed value
+ * 3. It prevents TypeScript from incorrectly unifying `T` and `U` during inference
+ *
+ * The `any` type is explicitly rejected via `0 extends 1 & T` check.
+ *
+ * @example
+ * ```ts
+ * type Target = { x: number };
+ * type GoodSource = { x: number; y: string }; // Extra properties are OK
+ * type BadSource = { x: string }; // Wrong type for x
+ *
+ * expectAssignableStrict<Target>()({} as GoodSource); // OK
+ * expectAssignableStrict<Target>()({} as BadSource); // Error
+ * expectAssignableStrict<any>()({} as GoodSource); // Error: any is rejected
+ * ```
+ */
+export function expectAssignableStrict<const T>(): <const U>(
+  this: [T] extends [never] ? never : [U] extends [never] ? never : void,
+  _: 0 extends 1 & T ? never : U extends T ? U : never,
+) => void {
+  return function <U>(
+    _: 0 extends 1 & T ? never : U extends T ? U : never,
+  ): void {};
+}
 
 /**
  * Asserts that one type is identical to another.
@@ -193,6 +320,12 @@ export type Equals<X, Y> =
   (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
     ? true
     : false;
+
+// 用于生成更友好的类型错误信息
+type Fail<T> = {
+  readonly __brand: unique symbol;
+  readonly _expected: T;
+};
 
 /**
  * Asserts that one type is identical to another.
@@ -210,6 +343,20 @@ export type Equals<X, Y> =
  * expectIdentical<A>()({} as C); // Error: C is not assignable to never
  * ```
  */
-export const expectIdentical =
-  <T>() =>
-  <U extends T>(_value: Equals<T, U> extends true ? U : never): void => {};
+export function expectIdentical<const T>(): <const U>(
+  this: [U] extends [never] ? ([T] extends [never] ? void : Fail<T>) : void,
+  _value: Equals<T, U> extends true ? U : Fail<T>,
+) => void {
+  return function <U>(_value: Equals<T, U> extends true ? U : Fail<T>): void {};
+}
+
+/**
+ * Gets the arity (number of parameters) of a function, including optional parameters.
+ * @template F - The function type to get arity from
+ * @returns The total number of parameters (required + optional)
+ */
+export type FunctionArity<F extends AnyFunction> = F extends (
+  ...args: infer A
+) => unknown
+  ? Required<A>['length']
+  : never;

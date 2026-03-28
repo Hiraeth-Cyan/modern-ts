@@ -17,6 +17,7 @@
 ### Precise Type Control
 - **Type Safety**: TypeScript validates argument types at compile time
 - **Intelligent Hints**: Each step of the call provides accurate type hints and autocomplete
+- **Early Error Detection**: Type errors are reported at the call site rather than when using the return value
 
 ### Explicit Arity Control
 - **Custom Argument Count**: Explicitly specify how many arguments need to be collected before executing the original function via the `length` parameter
@@ -26,27 +27,39 @@
 
 ```typescript
 // Create a curried function
-function curry<F extends (...args: any[]) => any>(fn: F, length: number): Curry<F>;
+function curry<F extends AnyFunction, N extends number>(
+  fn: ValidCurryFn<F>,
+  length: ValidLengthForFn<F, N>
+): Curry<F, N> & CurryBrand;
 
 // Placeholder symbol
 const __: unique symbol;
+type __ = typeof __;
 ```
 
 ### Parameters
 
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
-| `fn` | `F` | The original function to curry |
-| `length` | `number` | The number of arguments to collect (positive integer); the original function executes when this count is reached |
+| `fn` | `F` | The original function to curry. Must have at least 2 parameters. Cannot be already curried. Cannot have rest parameters. |
+| `length` | `N` | The number of arguments to collect (positive integer literal); the original function executes when this count is reached. Must be <= the number of function parameters. |
 
 ### Return Value
 
 - If the number of provided arguments (excluding placeholders) reaches `length`, returns the result of executing the original function
 - Otherwise, returns a new curried function awaiting more arguments
 
-### Exceptions
+### Type Constraints
 
-- Throws `ParameterError` when `length` is not a positive integer
+The following cases are prohibited by the type system and will report errors at the call site:
+
+- **Single-parameter functions**: Currying is meaningless for functions with only 1 parameter
+- **Zero-parameter functions**: Cannot curry functions with no parameters
+- **Length = 1**: Specifying length as 1 is not allowed
+- **Already curried functions**: Cannot curry a function that has already been curried
+- **Length > parameter count**: The specified length cannot exceed the number of function parameters
+- **Non-literal length**: Length must be a positive integer literal, not a `number` type variable
+- **Rest parameters**: Functions with rest parameters (`...args`) cannot be curried
 
 ## Usage Examples
 
@@ -162,15 +175,20 @@ console.log(curried1(5));  // 35 (5 + 10 + 20)
 const curried3 = curry(withDefaults, 3);
 console.log(curried3(5)(6)(7));  // 18 (5 + 6 + 7)
 console.log(curried3(5, 6, 7));  // 18
+
+// Optional parameters can be passed as undefined to use defaults
+const curried2 = curry(withDefaults, 2);
+console.log(curried2(5, undefined));  // 35 (5 + 10 + 20), b uses default
 ```
 
 ## Important Notes
 
 1. **Required `length` Parameter**: You must explicitly specify the number of arguments to collect
    ```typescript
-   // Error: length must be a positive integer
-   curry(add, 0);  // Throws ParameterError
-   curry(add, -1); // Throws ParameterError
+   // Error: length must be a positive integer literal
+   curry(add, 0);  // Type error
+   curry(add, -1); // Type error
+   curry(add, 1);  // Type error: length must be >= 2
    ```
 
 2. **Placeholder Replacement Rules**:
@@ -181,6 +199,7 @@ console.log(curried3(5, 6, 7));  // 18
 3. **Type Safety**:
    - Empty argument calls are blocked by the type system
    - Type mismatches are reported at compile time
+   - Errors are reported at the call site (contravariant position detection)
 
 4. **Execution Timing**:
    - The original function executes when `argument count - placeholder count >= length`
@@ -206,7 +225,12 @@ console.log(curried3(5, 6, 7));  // 18
      const noArgs = () => 42;
      // curry(noArgs, 0) will produce a type error
      ```
+   
+   - **Already Curried**: Cannot curry a function that has already been curried
+     ```typescript
+     const curried = curry(add, 3);
+     // curry(curried, 2) will produce a type error
+     ```
 
 6. **This Context**:
-   - Currying typically loses `this` context binding
-   - To preserve context, manually `bind` before use
+   - Currying preserves `this` context binding

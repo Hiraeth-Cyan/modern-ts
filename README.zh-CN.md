@@ -10,7 +10,7 @@
 
 > ⚠️ **测试版本提示**：当前处于测试阶段，正在收集社区反馈。API 可能随时发生破坏性更新，请谨慎用于生产环境
 
-***
+---
 
 ## 特性
 
@@ -51,10 +51,12 @@
 
 完善的工具函数库（近似 `lodash`）：
 
-- 类型安全的 `curry` / `pipe`（支持占位符和深层推导）
-- 高性能 `debounce` / `throttle`（边缘处理比`lodash`更健壮）
+- 完全类型安全的 `curry`（支持占位符和深层推导）/ `pipe` / `flip` / `ary` / `partial` / `partialRight`
+- 高性能 `debounce` / `throttle`（边缘处理比 `lodash` 更健壮）
 - 深拷贝 `cloneDeep`（支持循环引用，手写栈，支持十万级嵌套）
 - 常用类型工具、数组、对象、函数、字符串、Map/Set 工具函数
+
+全部TS原生、支持摇树、鲁棒性极高
 
 ### 🌐 FetchQ — HTTP 客户端
 
@@ -157,9 +159,9 @@ result.ok === true, result.value 为验证后的对象，类型如下：
 ### 示例：MockClock 并发时间模拟
 
 ```typescript
-import { MockClock, runTimelineAsync } from 'modern-ts/VirtualTime';
+import { MockClock, withTimelineAsync } from 'modern-ts/VirtualTime';
 
-// Concurrent testing: two independent timelines, isolated from each other
+// 并发测试：两个独立的时间线，相互隔离
 const clock1 = MockClock();
 const clock2 = MockClock();
 
@@ -168,15 +170,15 @@ let t2: number;
 
 await Promise.all([
   withTimelineAsync(clock1, async () => {
-    clock1.setSystemTime(1000); // Set start time
+    clock1.setSystemTime(1000); // 设置起始时间
     t1 = Date.now(); // 1000
   }),
   withTimelineAsync(clock2, async () => {
-    clock2.setSystemTime(2000); // Different start time
+    clock2.setSystemTime(2000); // 不同的起始时间
     t2 = Date.now(); // 2000
   }),
 ]);
-// t1 === 1000, t2 === 2000 (timeline isolation)
+// t1 === 1000, t2 === 2000 (时间线隔离)
 ```
 
 ### 示例：Scheduler 协作式调度
@@ -224,13 +226,13 @@ await Promise.all([
 
 ## API 文档
 
-详细的 API 文档请参阅 [docs/zh-CN](./docs/zh-CN) 目录）
-或`npm typedoc` 生成 API文档
+详细的 API 文档请参阅 [docs/zh-CN](./docs/zh-CN) 目录，
+或运行 `npx typedoc` 生成 API 文档
 
 ## 环境要求
 
 - Node.js >= 20
-- TypeScript >= 5.0
+- TypeScript >= 5.2
 
 ## 许可证
 

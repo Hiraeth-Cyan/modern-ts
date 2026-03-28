@@ -2,8 +2,8 @@
 // ./src/Utils/Functions/base.ts
 // ========================================
 
-import {isPromiseLike} from 'src/helper';
-import type {AnyFunction} from '../type-tool';
+import {dynamicAwait, isPromiseLike} from 'src/helper';
+import type {AnyFunction, MaybePromise} from '../type-tool';
 
 /**
  * Generic type for an identity function.
@@ -31,22 +31,6 @@ export const noop = (): void => {};
  * @returns A promise that resolves to `undefined`.
  */
 export const asyncNoop = async (): Promise<void> => {};
-
-/**
- * Creates a function that accepts up to one argument, ignoring any additional arguments.
- *
- * @template F - The function type.
- * @param fn - The function to cap arguments for.
- * @returns The new function.
- */
-export const unary = <F extends AnyFunction>(
-  fn: F,
-): ((this: ThisParameterType<F>, arg: Parameters<F>[0]) => ReturnType<F>) => {
-  return function (this: ThisParameterType<F>, arg: Parameters<F>[0]) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return fn.call(this, arg);
-  };
-};
 
 /**
  * Creates a function that negates the result of the predicate `fn`.
@@ -77,7 +61,6 @@ export const once = <Args extends unknown[], Ret>(
 ): ((this: ThisParameterType<typeof fn>, ...args: Args) => Ret) => {
   let done = false;
   let result: Ret;
-
   return function (this: ThisParameterType<typeof fn>, ...args: Args) {
     if (!done) {
       result = fn.apply(this, args);
@@ -85,81 +68,6 @@ export const once = <Args extends unknown[], Ret>(
     }
     return result;
   };
-};
-
-// -- Internal Types for ary --
-
-/**
- * Checks if the function has a rest parameter (...args) by comparing the length
- * of the parameter array to the length of the parameter array with placeholders replaced.
- * @template A - The parameter array of the function
- */
-type IsRestParameter<A extends readonly unknown[]> = number extends A['length']
-  ? true
-  : false;
-
-/**
- * Extracts the element type at a specific index from a tuple, preserving optionality.
- * @template T - The tuple type
- * @template I - The index to extract
- */
-type ExtractElement<
-  T extends readonly unknown[],
-  I extends number,
-> = T extends readonly unknown[] ? (I extends keyof T ? T[I] : never) : never;
-
-/**
- * Builds a tuple of length N by extracting elements from T, preserving optionality.
- * @template T - The source tuple
- * @template N - The target length
- * @template Acc - Accumulator for recursion
- */
-type TakePreserveOptional<
-  T extends readonly unknown[],
-  N extends number,
-  Acc extends readonly unknown[] = [],
-> = Acc['length'] extends N
-  ? Acc
-  : TakePreserveOptional<T, N, [...Acc, ExtractElement<T, Acc['length']>]>;
-
-/**
- * Overloaded type definition for the `ary` function.
- * Provides precise type inference based on the arity parameter.
- * For functions with rest parameters, the returned function still accepts any number of arguments.
- * @template F - The function type
- * @template N - The number of arguments to accept (must be a literal number)
- */
-type Ary<F, N extends number> = F extends (...args: infer A) => infer R
-  ? number extends N
-    ? {
-        readonly __error: 'The arity parameter must be a literal number (e.g., 2), not a variable of type number.';
-      }
-    : IsRestParameter<A> extends true
-      ? (this: ThisParameterType<F>, ...args: A) => R
-      : TakePreserveOptional<A, N> extends infer P
-        ? P extends readonly unknown[]
-          ? (this: ThisParameterType<F>, ...args: P) => R
-          : never
-        : never
-  : never;
-
-/**
- * Creates a function that invokes `fn` with only the first `n` arguments provided.
- *
- * @template F - The function type.
- * @template N - The number of arguments to accept (must be a literal number).
- * @param fn - The function to cap arguments for.
- * @param n - The number of arguments to accept.
- * @returns The new function with capped arguments.
- */
-export const ary = <F extends AnyFunction, N extends number>(
-  fn: F,
-  n: N,
-): Ary<F, N> => {
-  return function (this: ThisParameterType<F>, ...args: unknown[]) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return fn.apply(this, args.slice(0, n));
-  } as Ary<F, N>;
 };
 
 /**
@@ -212,60 +120,12 @@ export const spread = <Args extends unknown[], Ret>(
 };
 
 /**
- * Creates a function that invokes `fn` with `partial` arguments prepended to those provided to the new function.
- *
- * @template Fixed - The fixed arguments type.
- * @template Rest - The remaining arguments type.
- * @template Ret - The return type.
- * @param fn - The function to partially apply arguments to.
- * @param fixedArgs - The arguments to prepend.
- * @returns The new partially applied function.
+ * Symbolic placeholder for a value that has not been invoked.
  */
-export const partial = <Fixed extends unknown[], Rest extends unknown[], Ret>(
-  fn: (...args: [...Fixed, ...Rest]) => Ret,
-  ...fixedArgs: Fixed
-): ((this: ThisParameterType<typeof fn>, ...rest: Rest) => Ret) => {
-  return function (this: ThisParameterType<typeof fn>, ...restArgs: Rest) {
-    return fn.apply(this, [...fixedArgs, ...restArgs] as Parameters<typeof fn>);
-  };
-};
-
-/**
- * Extracts the remaining arguments from a function's parameter tuple after fixed arguments are removed from the end.
- * @template T - The function's parameter tuple
- * @template Fixed - The fixed arguments to remove from the end
- */
-type ExtractRest<
-  T extends readonly unknown[],
-  Fixed extends readonly unknown[],
-> = T extends [...infer Rest, ...Fixed] ? Rest : never;
-
-/**
- * Creates a function that invokes `fn` with `partial` arguments appended to those provided to the new function.
- *
- * @template T - The function type.
- * @template Fixed - The fixed arguments type (appended).
- * @param fn - The function to partially apply arguments to.
- * @param fixedArgs - The arguments to append.
- * @returns The new partially applied function.
- */
-export const partialRight = <T extends AnyFunction, Fixed extends unknown[]>(
-  fn: T,
-  ...fixedArgs: Fixed
-): ((
-  this: ThisParameterType<T>,
-  ...rest: ExtractRest<Parameters<T>, Fixed>
-) => ReturnType<T>) => {
-  return function (
-    this: ThisParameterType<T>,
-    ...restArgs: ExtractRest<Parameters<T>, Fixed>
-  ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return Reflect.apply(fn, this, [...restArgs, ...fixedArgs]);
-  };
-};
-
 export const NOT_INVOKED = Symbol('notInvoked');
+/**
+ * The type of the symbolic placeholder for a value that has not been invoked.
+ */
 export type NotInvoked = typeof NOT_INVOKED;
 
 /**
@@ -324,36 +184,114 @@ export const before = <Args extends unknown[], Ret>(
 };
 
 /**
- * Creates a function that memoizes the result of `fn`.
- * If `resolver` is provided, it determines the cache key for storing the result based on the arguments provided.
+ * Cache interface for memoization.
  *
- * @template Args - The arguments type.
- * @template Ret - The return type.
- * @param fn - The function to memoize.
- * @param resolver - The function to resolve the cache key.
- * @returns The new memoized function.
+ * @template K - The cache key type.
+ * @template V - The cached value type.
  */
-export const memoize = <Args extends unknown[], Ret>(
-  fn: (...args: Args) => Ret,
-  resolver?: (this: ThisParameterType<typeof fn>, ...args: Args) => unknown,
-): ((this: ThisParameterType<typeof fn>, ...args: Args) => Ret) => {
-  const cache = new Map<unknown, Ret>();
-  return function (this: ThisParameterType<typeof fn>, ...args: Args) {
-    const key = resolver ? resolver.apply(this, args) : JSON.stringify(args);
+export interface MemoizeCache<K, V> {
+  /**
+   * Stores a value with the specified key.
+   *
+   * @param key - The key to associate with the value.
+   * @param value - The value to store.
+   */
+  set(key: K, value: V): void;
 
-    if (cache.has(key)) return cache.get(key) as Ret;
-    const result = fn.apply(this, args);
+  /**
+   * Retrieves a value by its key.
+   *
+   * @param key - The key to look up.
+   * @returns The cached value, or undefined if not found.
+   */
+  get(key: K): V | undefined;
+
+  /**
+   * Checks if a key exists in the cache.
+   *
+   * @param key - The key to check.
+   * @returns True if the key exists.
+   */
+  has(key: K): boolean;
+
+  /**
+   * Deletes a value by its key.
+   *
+   * @param key - The key to delete.
+   * @returns True if deleted successfully.
+   */
+  delete(key: K): boolean | void;
+
+  /**
+   * Clears all cached values.
+   */
+  clear(): void;
+
+  /**
+   * The number of entries in the cache.
+   */
+  readonly size: number;
+}
+
+/**
+ * Options for creating a memoized function.
+ *
+ * @template K - The cache key type.
+ * @template V - The cached value type.
+ * @template Args - The function arguments type.
+ */
+export interface MemoizeOptions<K, V, Args extends unknown[] = unknown[]> {
+  /**
+   * The cache instance to use for storing results.
+   * Defaults to a new Map if not provided.
+   */
+  cache?: MemoizeCache<K, V>;
+
+  /**
+   * A function to generate the cache key from the function arguments.
+   * Defaults to JSON.stringify of all arguments if not provided.
+   */
+  getCacheKey?: (...args: Args) => K;
+}
+
+/**
+ * Creates a function that memoizes the result of `fn` using a configurable cache strategy.
+ *
+ * @template F - The function type to memoize.
+ * @param fn - The function to memoize.
+ * @param options - The memoization options including cache strategy and key generator.
+ * @returns The new memoized function with a `cache` property attached.
+ */
+export function memoize<F extends AnyFunction>(
+  fn: F,
+  options: MemoizeOptions<unknown, ReturnType<F>, Parameters<F>> = {},
+): F & {cache: MemoizeCache<unknown, ReturnType<F>>} {
+  const {cache = new Map<unknown, ReturnType<F>>(), getCacheKey} = options;
+
+  const memoizedFn = function (
+    this: unknown,
+    ...args: Parameters<F>
+  ): ReturnType<F> {
+    const key = getCacheKey ? getCacheKey(...args) : JSON.stringify(args);
+
+    if (cache.has(key)) return cache.get(key) as ReturnType<F>;
+
+    const result = fn.apply(this, args) as ReturnType<F>;
     cache.set(key, result);
     return result;
   };
-};
+
+  memoizedFn.cache = cache;
+
+  return memoizedFn as F & {cache: MemoizeCache<unknown, ReturnType<F>>};
+}
 
 type AttemptResult<T> = [T] extends [never]
   ? [unknown, undefined]
   : 0 extends 1 & T
     ? [undefined, T] | [unknown, undefined]
     : T extends PromiseLike<infer R>
-      ? PromiseLike<[undefined, R] | [unknown, undefined]>
+      ? Promise<[undefined, R] | [unknown, undefined]>
       : [undefined, T] | [unknown, undefined];
 
 /**
@@ -407,4 +345,81 @@ export const attempt = <Args extends unknown[], R>(
       return [err, undefined] as AttemptResult<R>;
     }
   };
+};
+
+/**
+ * Symbol used to indicate no error occurred during task execution.
+ */
+export const DEFER_NO_ERROR = Symbol('No Error');
+
+/**
+ * Type for error callback functions registered with defer.
+ * @param error - The error from the task, or DEFER_NO_ERROR if task succeeded
+ * @returns A promise or value (return value is ignored)
+ */
+type DeferErrorCallback = (error: unknown) => unknown;
+
+/**
+ * Function type for registering cleanup/error callbacks.
+ * @param fn - The callback function to register
+ */
+type DeferRegisterFn = (fn: DeferErrorCallback) => void;
+
+/**
+ * Executes a task with deferred cleanup/error handling callbacks.
+ *
+ * This function provides a resource management pattern similar to try-finally,
+ * but with support for async cleanup and multiple callbacks. Callbacks are
+ * executed in reverse order (LIFO) regardless of task success or failure.
+ *
+ * @template R - The type of the task result
+ * @param task - A function that receives a register function and returns a result
+ * @returns A promise that resolves with the task result
+ * @throws {AggregateError} If both the task and callbacks fail, or if multiple callbacks fail
+ * @throws {unknown} If only the task fails and callbacks succeed, the original error is thrown
+ * @throws {AggregateError} If only callbacks fail, an AggregateError is thrown
+ *
+ * @example
+ * ```typescript
+ * const result = await defer(async (register) => {
+ *   const resource = acquireResource();
+ *   register(async (error) => {
+ *     await resource.release();
+ *   });
+ *   return resource.use();
+ * });
+ * ```
+ */
+export const defer = async <R>(
+  task: (register: DeferRegisterFn) => MaybePromise<R>,
+) => {
+  const callbacks: DeferErrorCallback[] = [];
+  const register = (fn: DeferErrorCallback) => void callbacks.push(fn);
+  let result_value: R;
+  let error_arg: unknown = DEFER_NO_ERROR;
+  const callback_errors: unknown[] = [];
+
+  try {
+    result_value = await dynamicAwait(task(register));
+  } catch (e) {
+    error_arg = e;
+  } finally {
+    for (let i = callbacks.length - 1; i >= 0; i--)
+      try {
+        await callbacks[i](error_arg);
+      } catch (e) {
+        callback_errors.push(e);
+      }
+  }
+  if (error_arg !== DEFER_NO_ERROR) {
+    if (callback_errors.length > 0) {
+      const all_errors = [error_arg, ...callback_errors];
+      throw new AggregateError(all_errors, 'defer: task and callbacks failed');
+    }
+    throw error_arg;
+  }
+  if (callback_errors.length > 0)
+    throw new AggregateError(callback_errors, 'defer: callbacks failed');
+
+  return result_value!;
 };

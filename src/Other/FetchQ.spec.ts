@@ -2,7 +2,8 @@
 // ./src/Other/FetchQ.spec.ts
 // ========================================
 
-import {describe, it, expect, vi, afterEach} from 'vitest';
+import {AsyncLocalStorage} from 'async_hooks';
+import {describe, it, expect, vi, type Mock} from 'vitest';
 import {
   FetchQ,
   QStop,
@@ -13,9 +14,31 @@ import {
 import type {Result} from '../Result/types';
 import {sleep} from '../Concurrent/delay';
 
+// 存储当前测试上下文的 Mock 函数
+const mockStorage = new AsyncLocalStorage<Mock<typeof fetch>>();
+
+// 保存原始 fetch
 const originalFetch = globalThis.fetch;
 
-// -- Helper: 创建 mock response --
+globalThis.fetch = async (input, init) => {
+  const store = mockStorage.getStore();
+  if (store) {
+    // 在上下文中，调用 Mock
+    return store(input, init);
+  }
+  // 不在上下文中，调用真实请求（或上层的 mock）
+  return originalFetch(input, init);
+};
+
+// 封装 Mock 获取函数
+const useMockFetch = () => {
+  const mock = mockStorage.getStore();
+  if (!mock)
+    throw new Error('useMockFetch must be called inside a test context!');
+  return mock;
+};
+
+// Helper: 设置 mock response (保持原有逻辑)
 const createMockResponse = (
   data: unknown,
   options: Partial<Response> = {},
@@ -51,25 +74,41 @@ const createMockResponse = (
 const headerHas = (headers: Headers | undefined, key: string, value: string) =>
   headers instanceof Headers && headers.get(key) === value;
 
-// -- Helper: 设置 mock fetch --
+// 适配原有的 setupMockFetch，改为从 ALS 获取并初始化
+// 注意：在并发模式下，通常不需要 restoreFetch，因为每个测试有独立的 mock 实例
 const setupMockFetch = () => {
-  const mockFetch = vi.fn();
-  globalThis.fetch = mockFetch as typeof fetch;
+  const mockFetch = useMockFetch();
+  // 重置 mock 状态（虽然每个测试是新实例，但以防万一同一个 test 函数被复用）
+  mockFetch.mockClear();
   return mockFetch;
 };
 
-const restoreFetch = () => {
-  globalThis.fetch = originalFetch;
-  vi.restoreAllMocks();
+// 标准化测试接口，自动包裹 ALS 上下文
+const test = (name: string, fn: () => Promise<void> | void) => {
+  it(name, async () => {
+    // 为每个测试创建独立的 Mock 实例
+    const mockFn = vi.fn();
+    // 在 ALS 存储中运行测试
+    await mockStorage.run(mockFn, fn);
+  });
 };
 
-describe('FetchQ', () => {
+// 支持 it.each 语法
+test.each = <T>(cases: ReadonlyArray<T>) => {
+  return (name: string, fn: (arg: T) => Promise<void> | void) => {
+    it.each(cases)(name, async (arg: T) => {
+      const mockFn = vi.fn();
+      await mockStorage.run(mockFn, () => fn(arg));
+    });
+  };
+};
+
+// 使用 describe.concurrent 开启并发
+describe.concurrent('FetchQ', () => {
   // ============================================
   // HTTP Method Shortcuts Tests
   // ============================================
   describe('HTTP Method Shortcuts', () => {
-    afterEach(restoreFetch);
-
     const methodCases: Array<{
       method: string;
       fn: (q: FetchQ, url: string) => Promise<unknown>;
@@ -84,7 +123,7 @@ describe('FetchQ', () => {
       {method: 'OPTIONS', fn: (q, url) => q.options(url)},
     ];
 
-    it.each(methodCases)(
+    test.each(methodCases)(
       'should make $method request',
       async ({method, fn, hasBody}) => {
         const mockFetch = setupMockFetch();
@@ -108,9 +147,7 @@ describe('FetchQ', () => {
   // URL Building Tests
   // ============================================
   describe('URL Building', () => {
-    afterEach(restoreFetch);
-
-    it('should handle absolute URL directly', async () => {
+    test('should handle absolute URL directly', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -121,7 +158,7 @@ describe('FetchQ', () => {
       );
     });
 
-    it('should append baseUrl to relative path', async () => {
+    test('should append baseUrl to relative path', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ({baseUrl: 'https://api.example.com'});
@@ -132,7 +169,7 @@ describe('FetchQ', () => {
       );
     });
 
-    it('should handle baseUrl with and without trailing slash', async () => {
+    test('should handle baseUrl with and without trailing slash', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ({baseUrl: 'https://api.example.com/'});
@@ -143,7 +180,7 @@ describe('FetchQ', () => {
       );
     });
 
-    it('should append query params to URL', async () => {
+    test('should append query params to URL', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -153,7 +190,7 @@ describe('FetchQ', () => {
       expect(calledUrl).toContain('limit=10');
     });
 
-    it('should handle array, object, null/undefined, and special query params', async () => {
+    test('should handle array, object, null/undefined, and special query params', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -182,7 +219,7 @@ describe('FetchQ', () => {
       expect(calledUrl).toContain('bool=true');
     });
 
-    it('should handle protocol relative URL', async () => {
+    test('should handle protocol relative URL', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       // https baseUrl
@@ -203,7 +240,7 @@ describe('FetchQ', () => {
       );
     });
 
-    it('should preserve query params from baseUrl', async () => {
+    test('should preserve query params from baseUrl', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ({baseUrl: 'https://api.example.com?version=1'});
@@ -217,9 +254,7 @@ describe('FetchQ', () => {
   // Request Interceptor Tests
   // ============================================
   describe('Request Interceptors', () => {
-    afterEach(restoreFetch);
-
-    it('should apply request interceptors in order', async () => {
+    test('should apply request interceptors in order', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -248,9 +283,7 @@ describe('FetchQ', () => {
   // Response Interceptor Tests
   // ============================================
   describe('Response Interceptors', () => {
-    afterEach(restoreFetch);
-
-    it('should apply response interceptors in order', async () => {
+    test('should apply response interceptors in order', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -268,7 +301,7 @@ describe('FetchQ', () => {
       expect(order).toEqual([1, 2]);
     });
 
-    it('should handle cloneResponseInInterceptor option', async () => {
+    test('should handle cloneResponseInInterceptor option', async () => {
       const mockFetch = setupMockFetch();
       const cancelSpy = vi.fn();
       const mockResponse = {
@@ -296,7 +329,7 @@ describe('FetchQ', () => {
       expect(cancelSpy).toHaveBeenCalled();
     });
 
-    it('should handle cancel error gracefully when cloning', async () => {
+    test('should handle cancel error gracefully when cloning', async () => {
       const mockFetch = setupMockFetch();
       const cancelSpy = vi.fn().mockRejectedValue(new Error('Cancel failed'));
       const mockResponse = {
@@ -316,7 +349,7 @@ describe('FetchQ', () => {
       expect(cancelSpy).toHaveBeenCalled();
     });
 
-    it('should cancel stream when response interceptor throws', async () => {
+    test('should cancel stream when response interceptor throws', async () => {
       const mockFetch = setupMockFetch();
       const cancelSpyOriginal = vi.fn();
       const cancelSpyCloned = vi.fn();
@@ -354,7 +387,7 @@ describe('FetchQ', () => {
       expect(cancelSpyCloned).toHaveBeenCalled();
     });
 
-    it('should cancel stream when response interceptor throws in non-clone mode', async () => {
+    test('should cancel stream when response interceptor throws in non-clone mode', async () => {
       const mockFetch = setupMockFetch();
       const cancelSpy = vi.fn();
       const mockResponse = {
@@ -386,9 +419,7 @@ describe('FetchQ', () => {
   // Error Handling Tests
   // ============================================
   describe('Error Handling', () => {
-    afterEach(restoreFetch);
-
-    it('should return http error for non-ok response', async () => {
+    test('should return http error for non-ok response', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Not found'}, {ok: false, status: 404}),
@@ -403,7 +434,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return network error for TypeError', async () => {
+    test('should return network error for TypeError', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
       const q = new FetchQ();
@@ -414,7 +445,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return parse error for invalid JSON', async () => {
+    test('should return parse error for invalid JSON', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse('invalid json', {ok: true}),
@@ -427,7 +458,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return timeout error for TimeoutError DOMException', async () => {
+    test('should return timeout error for TimeoutError DOMException', async () => {
       const mockFetch = setupMockFetch();
       const timeoutError = new DOMException('Timeout', 'TimeoutError');
       mockFetch.mockRejectedValueOnce(timeoutError);
@@ -441,7 +472,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return abort error when signal is aborted', async () => {
+    test('should return abort error when signal is aborted', async () => {
       const mockFetch = setupMockFetch();
       const abortError = new DOMException('Aborted', 'AbortError');
       mockFetch.mockRejectedValueOnce(abortError);
@@ -457,7 +488,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return network error for other DOMException and non-Error values', async () => {
+    test('should return network error for other DOMException and non-Error values', async () => {
       const mockFetch = setupMockFetch();
       // 其他 DOMException
       mockFetch.mockRejectedValueOnce(
@@ -496,7 +527,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should handle network error during response parsing', async () => {
+    test('should handle network error during response parsing', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse = {
         ok: true,
@@ -521,9 +552,7 @@ describe('FetchQ', () => {
   // Response Type Tests
   // ============================================
   describe('Response Types', () => {
-    afterEach(restoreFetch);
-
-    it('should parse JSON response by default', async () => {
+    test('should parse JSON response by default', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({name: 'test'}));
       const q = new FetchQ();
@@ -534,7 +563,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return text response', async () => {
+    test('should return text response', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse('plain text'));
       const q = new FetchQ();
@@ -545,7 +574,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return blob response', async () => {
+    test('should return blob response', async () => {
       const mockFetch = setupMockFetch();
       const blob = new Blob(['blob data'], {type: 'text/plain'});
       mockFetch.mockResolvedValueOnce(createMockResponse(blob));
@@ -557,7 +586,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return arrayBuffer response', async () => {
+    test('should return arrayBuffer response', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -570,7 +599,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return stream response', async () => {
+    test('should return stream response', async () => {
       const mockFetch = setupMockFetch();
       const streamContent = new TextEncoder().encode('stream data');
       const mockResponse = {
@@ -602,7 +631,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return null when stream response has no body', async () => {
+    test('should return null when stream response has no body', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse = {
         ok: true,
@@ -626,7 +655,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should use custom jsonParser', async () => {
+    test('should use custom jsonParser', async () => {
       const mockFetch = setupMockFetch();
       const customParser = vi.fn((text: string): unknown => ({
         ...JSON.parse(text),
@@ -641,7 +670,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should handle empty response body', async () => {
+    test('should handle empty response body', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse(''));
       const q = new FetchQ();
@@ -652,7 +681,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should handle parse error with non-Error thrown value', async () => {
+    test('should handle parse error with non-Error thrown value', async () => {
       const mockFetch = setupMockFetch();
       const customParser = vi.fn(() => {
         // eslint-disable-next-line @typescript-eslint/only-throw-error -- 测试非 Error 异常的处理
@@ -675,9 +704,7 @@ describe('FetchQ', () => {
   // Transform Tests
   // ============================================
   describe('Transform', () => {
-    afterEach(restoreFetch);
-
-    it('should apply global and per-request transform', async () => {
+    test('should apply global and per-request transform', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ({
@@ -690,7 +717,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should override global transform with per-request transform', async () => {
+    test('should override global transform with per-request transform', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ({
@@ -710,9 +737,7 @@ describe('FetchQ', () => {
   // Headers Tests
   // ============================================
   describe('Headers', () => {
-    afterEach(restoreFetch);
-
-    it('should set default headers and merge with request headers', async () => {
+    test('should set default headers and merge with request headers', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ({default_headers: {'X-Default': 'value'}});
@@ -726,7 +751,7 @@ describe('FetchQ', () => {
       );
     });
 
-    it('should override default headers with request headers', async () => {
+    test('should override default headers with request headers', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ({default_headers: {'X-Override': 'default'}});
@@ -737,7 +762,7 @@ describe('FetchQ', () => {
       ).toBe(true);
     });
 
-    it('should set Content-Type for JSON body', async () => {
+    test('should set Content-Type for JSON body', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -752,7 +777,7 @@ describe('FetchQ', () => {
       ).toBe(true);
     });
 
-    it('should not override existing Content-Type and Accept headers', async () => {
+    test('should not override existing Content-Type and Accept headers', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -778,7 +803,7 @@ describe('FetchQ', () => {
       ).toBe(true);
     });
 
-    it('should set Accept header based on responseType', async () => {
+    test('should set Accept header based on responseType', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -798,11 +823,9 @@ describe('FetchQ', () => {
   // Body Types Tests
   // ============================================
   describe('Body Types', () => {
-    afterEach(restoreFetch);
-
-    it('should send various body types', async () => {
+    test('should send various body types', async () => {
       const mockFetch = setupMockFetch();
-      mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
+      mockFetch.mockResolvedValue(createMockResponse({data: 'test'})); // auto mock for multiple calls
       const q = new FetchQ();
 
       // Blob
@@ -812,7 +835,6 @@ describe('FetchQ', () => {
       expect(config.body).toBe(blob);
 
       // FormData
-      mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const formData = new FormData();
       formData.append('field', 'value');
       await q.post('/test', formData);
@@ -820,11 +842,20 @@ describe('FetchQ', () => {
       expect(config.body).toBe(formData);
 
       // ArrayBuffer
-      mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const buffer = new TextEncoder().encode('test').buffer;
       await q.post('/test', buffer);
       config = mockFetch.mock.calls[2][1] as RequestInit;
       expect(config.body).toBe(buffer);
+    });
+
+    test('should use body from options when data is not provided', async () => {
+      const mockFetch = setupMockFetch();
+      mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
+      const q = new FetchQ();
+      const bodyContent = 'raw body content';
+      await q.request('/test', {method: 'POST', body: bodyContent});
+      const config = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(config.body).toBe(bodyContent);
     });
   });
 
@@ -832,9 +863,7 @@ describe('FetchQ', () => {
   // Retry Tests
   // ============================================
   describe('Retry', () => {
-    afterEach(restoreFetch);
-
-    it('should retry on 5xx error', async () => {
+    test('should retry on 5xx error', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -849,7 +878,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should not retry on 4xx error (except 429)', async () => {
+    test('should not retry on 4xx error (except 429)', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Not found'}, {ok: false, status: 404}),
@@ -860,7 +889,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should use custom shouldRetry function', async () => {
+    test('should use custom shouldRetry function', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -881,7 +910,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should respect RetryStop from shouldRetry', async () => {
+    test('should respect RetryStop from shouldRetry', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Error'}, {ok: false, status: 500}),
@@ -895,7 +924,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should retry POST when maxAttempts is explicitly set or retryableMethods includes POST', async () => {
+    test('should retry POST when maxAttempts is explicitly set or retryableMethods includes POST', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -914,7 +943,8 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
 
       // retryableMethods 包含 POST
-      mockFetch
+      const mockFetch2 = useMockFetch(); // New context needs new mock? No, still in same test context
+      mockFetch2
         .mockResolvedValueOnce(
           createMockResponse({error: 'Error'}, {ok: false, status: 500}),
         )
@@ -930,7 +960,7 @@ describe('FetchQ', () => {
       expect(result2.ok).toBe(true);
     });
 
-    it('should not retry POST when retryableMethods does not include POST', async () => {
+    test('should not retry POST when retryableMethods does not include POST', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Error'}, {ok: false, status: 500}),
@@ -947,8 +977,8 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should throw error when retrying with ReadableStream body', async () => {
-      setupMockFetch();
+    test('should throw error when retrying with ReadableStream body', async () => {
+      setupMockFetch(); // need to setup even if not calling, to keep context clean
       const q = new FetchQ();
       const stream = new ReadableStream({
         start(controller) {
@@ -961,9 +991,8 @@ describe('FetchQ', () => {
       ).rejects.toThrow('Retry is not supported for ReadableStream body');
     });
 
-    it('should respect Retry-After header', async () => {
+    test('should respect Retry-After header', async () => {
       const mockFetch = setupMockFetch();
-      // 秒数格式
       const mockResponse429 = {
         ok: false,
         status: 429,
@@ -985,9 +1014,8 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should handle Retry-After header as date', async () => {
+    test('should handle Retry-After header as date', async () => {
       const mockFetch = setupMockFetch();
-      // 未来日期
       const futureDate = new Date(Date.now() + 1000);
       const mockResponseFuture = {
         ok: false,
@@ -1049,7 +1077,7 @@ describe('FetchQ', () => {
       expect(result3.ok).toBe(true);
     });
 
-    it('should handle invalid Retry-After header gracefully', async () => {
+    test('should handle invalid Retry-After header gracefully', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse429 = {
         ok: false,
@@ -1072,7 +1100,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should retry on 429 status', async () => {
+    test('should retry on 429 status', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse429 = {
         ok: false,
@@ -1095,9 +1123,8 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should retry on timeout and network error', async () => {
+    test('should retry on timeout and network error', async () => {
       const mockFetch = setupMockFetch();
-      // 超时错误
       const timeoutError = new DOMException('Timeout', 'TimeoutError');
       mockFetch
         .mockRejectedValueOnce(timeoutError)
@@ -1118,7 +1145,7 @@ describe('FetchQ', () => {
       expect(result2.ok).toBe(true);
     });
 
-    it('should update config from RetryContinue', async () => {
+    test('should update config from RetryContinue', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -1140,7 +1167,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should update config from RetryContinue without headers', async () => {
+    test('should update config from RetryContinue without headers', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -1162,7 +1189,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should use exponential backoff with jitter', async () => {
+    test('should use exponential backoff with jitter', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -1177,7 +1204,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should not retry when maxAttempts is 0', async () => {
+    test('should not retry when maxAttempts is 0', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Error'}, {ok: false, status: 500}),
@@ -1188,7 +1215,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should not retry when retryableMethods is empty', async () => {
+    test('should not retry when retryableMethods is empty', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Error'}, {ok: false, status: 500}),
@@ -1199,7 +1226,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should retry when retryableMethods is null', async () => {
+    test('should retry when retryableMethods is null', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -1214,7 +1241,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should check method retryable when retryableMethods is null without maxAttempts', async () => {
+    test('should check method retryable when retryableMethods is null without maxAttempts', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Error'}, {ok: false, status: 500}),
@@ -1225,7 +1252,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle abort signal during retry delay', async () => {
+    test('should handle abort signal during retry delay', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Error'}, {ok: false, status: 500}),
@@ -1243,7 +1270,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should handle timeout during retry delay without external signal', async () => {
+    test('should handle timeout during retry delay without external signal', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Error'}, {ok: false, status: 500}),
@@ -1258,7 +1285,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should handle request without explicit method (default GET for retry check)', async () => {
+    test('should handle request without explicit method (default GET for retry check)', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -1273,7 +1300,7 @@ describe('FetchQ', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should use default initialDelay when not provided', async () => {
+    test('should use default initialDelay when not provided', async () => {
       const mockFetch = setupMockFetch();
       mockFetch
         .mockResolvedValueOnce(
@@ -1293,9 +1320,7 @@ describe('FetchQ', () => {
   // Progress Callback Tests
   // ============================================
   describe('Progress Callback', () => {
-    afterEach(restoreFetch);
-
-    it('should mark FormData upload as indeterminate', async () => {
+    test('should mark FormData upload as indeterminate', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({success: true}));
       const q = new FetchQ();
@@ -1312,23 +1337,24 @@ describe('FetchQ', () => {
     const createProgressMockFetch = () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockImplementation(
-        (_url: string, config: RequestInit): Promise<Response> => {
-          return (async () => {
-            if (config.body && config.body instanceof ReadableStream) {
-              const reader = (config.body as ReadableStream).getReader();
-              while (true) {
-                const {done} = await reader.read();
-                if (done) break;
-              }
+        async (
+          _input: string | Request | URL,
+          config?: RequestInit,
+        ): Promise<Response> => {
+          if (config?.body && config.body instanceof ReadableStream) {
+            const reader = (config.body as ReadableStream).getReader();
+            while (true) {
+              const {done} = await reader.read();
+              if (done) break;
             }
-            return createMockResponse({success: true});
-          })();
+          }
+          return createMockResponse({success: true});
         },
       );
       return mockFetch;
     };
 
-    it('should report upload progress for various body types', async () => {
+    test('should report upload progress for various body types', async () => {
       createProgressMockFetch();
       const q = new FetchQ();
 
@@ -1403,9 +1429,9 @@ describe('FetchQ', () => {
       expect(progressEvents[0].indeterminate).toBe(true);
     });
 
-    it('should handle upload progress with null or empty body', async () => {
+    test('should handle upload progress with null or empty body', async () => {
       const mockFetch = setupMockFetch();
-      mockFetch.mockResolvedValueOnce(createMockResponse({success: true}));
+      mockFetch.mockResolvedValue(createMockResponse({success: true}));
       const q = new FetchQ();
       let progressEvents: ProgressEvent[] = [];
       await q.post('/upload', null, {
@@ -1413,7 +1439,6 @@ describe('FetchQ', () => {
       });
       expect(progressEvents.length).toBe(0);
 
-      mockFetch.mockResolvedValueOnce(createMockResponse({success: true}));
       progressEvents = [];
       await q.post('/upload', '', {
         onUploadProgress: (event: ProgressEvent) => progressEvents.push(event),
@@ -1421,7 +1446,7 @@ describe('FetchQ', () => {
       expect(progressEvents.length).toBe(0);
     });
 
-    it('should handle download progress callback', async () => {
+    test('should handle download progress callback', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse = {
         ok: true,
@@ -1451,7 +1476,7 @@ describe('FetchQ', () => {
       expect(progressEvents[progressEvents.length - 1].percentage).toBe(100);
     });
 
-    it('should handle download progress with indeterminate size', async () => {
+    test('should handle download progress with indeterminate size', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse = {
         ok: true,
@@ -1481,7 +1506,7 @@ describe('FetchQ', () => {
       expect(progressEvents[0].indeterminate).toBe(true);
     });
 
-    it('should report download progress for stream response', async () => {
+    test('should report download progress for stream response', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse = {
         ok: true,
@@ -1524,9 +1549,7 @@ describe('FetchQ', () => {
   // Request Object Tests
   // ============================================
   describe('Request Object', () => {
-    afterEach(restoreFetch);
-
-    it('should accept Request object', async () => {
+    test('should accept Request object', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -1538,7 +1561,7 @@ describe('FetchQ', () => {
       expect(result.ok).toBe(true);
     });
 
-    it('should merge Request headers with config headers', async () => {
+    test('should merge Request headers with config headers', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -1556,7 +1579,7 @@ describe('FetchQ', () => {
       );
     });
 
-    it('should override Request body when data parameter is provided', async () => {
+    test('should override Request body when data parameter is provided', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(createMockResponse({data: 'test'}));
       const q = new FetchQ();
@@ -1574,11 +1597,9 @@ describe('FetchQ', () => {
   // Edge Cases Tests
   // ============================================
   describe('Edge Cases', () => {
-    afterEach(restoreFetch);
-
-    it('should handle null, undefined, and empty object data', async () => {
+    test('should handle null, undefined, and empty object data', async () => {
       const mockFetch = setupMockFetch();
-      mockFetch.mockResolvedValueOnce(createMockResponse({success: true}));
+      mockFetch.mockResolvedValue(createMockResponse({success: true}));
       const q = new FetchQ();
 
       // null
@@ -1586,12 +1607,10 @@ describe('FetchQ', () => {
       expect(result.ok).toBe(true);
 
       // undefined
-      mockFetch.mockResolvedValueOnce(createMockResponse({success: true}));
       result = await q.post('/test', undefined);
       expect(result.ok).toBe(true);
 
       // 空对象
-      mockFetch.mockResolvedValueOnce(createMockResponse({success: true}));
       result = await q.post('/test', {});
       expect(result.ok).toBe(true);
       const config = mockFetch.mock.calls[2][1] as RequestInit;
@@ -1603,9 +1622,7 @@ describe('FetchQ', () => {
   // maxErrorBodySize Tests
   // ============================================
   describe('maxErrorBodySize', () => {
-    afterEach(restoreFetch);
-
-    it('should limit error body size when response exceeds maxErrorBodySize', async () => {
+    test('should limit error body size when response exceeds maxErrorBodySize', async () => {
       const mockFetch = setupMockFetch();
       const largeContent = 'x'.repeat(200);
       const mockResponse = {
@@ -1635,7 +1652,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should read error body within maxErrorBodySize limit', async () => {
+    test('should read error body within maxErrorBodySize limit', async () => {
       const mockFetch = setupMockFetch();
       const errorBody = JSON.stringify({error: 'Not found', code: 404});
       const mockResponse = {
@@ -1665,7 +1682,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should handle error body read failure gracefully', async () => {
+    test('should handle error body read failure gracefully', async () => {
       const mockFetch = setupMockFetch();
       const readError = new Error('Stream read error');
       const mockResponse = {
@@ -1694,7 +1711,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should return undefined when maxErrorBodySize is 0', async () => {
+    test('should return undefined when maxErrorBodySize is 0', async () => {
       const mockFetch = setupMockFetch();
       mockFetch.mockResolvedValueOnce(
         createMockResponse({error: 'Server error'}, {ok: false, status: 500}),
@@ -1709,7 +1726,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should handle error response without body', async () => {
+    test('should handle error response without body', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse = {
         ok: false,
@@ -1733,7 +1750,7 @@ describe('FetchQ', () => {
       }
     });
 
-    it('should handle error response with Content-Length exceeding limit', async () => {
+    test('should handle error response with Content-Length exceeding limit', async () => {
       const mockFetch = setupMockFetch();
       const mockResponse = {
         ok: false,
